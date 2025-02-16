@@ -64,7 +64,7 @@
                 top: 0px;
                 position: absolute;
                 width: 200px;
-                height: 475px;
+                height: 540px;
                 border-radius: 5px;
                 background-color: rgba(191,191,191,0.4);
                 padding: 10px 10px;
@@ -89,7 +89,7 @@
                 <div style="align-items: center; display: grid; padding: 5px;">
                     <button class="need-forbidden" onclick="reDraw()">重绘</button>
                 </div>
-                <div style="align-items: center; padding: 5px;">
+                <div style="align-items: center; padding: 5px;" class="group-panel">
                     <div>
                         <div style="width: 20px;display: inline-block;">←</div>
                         <input id="leftExtCount" type="number" style="width: 50px;" value="0" >
@@ -102,13 +102,27 @@
                         <div style="width: 20px;display: inline-block;">↓</div>
                         <input id="bottomExtCount" type="number" style="width: 50px;" value="0" >
                     </div>
-                    <div style="align-items: right;">
+                    <div style="align-items: right; margin-bottom: 10px;">
                         <button style="position:relative; right: -134px; top: 5px;" class="need-forbidden" onclick="extend()">扩展</button>
                     </div>
                 </div>
-            </div>
-            <div class="group-panel">
-                <div><input id="editCheckbox" class="need-forbidden" type="checkbox" onchange="toggleEditable()" /><span>编辑点</span></div>
+                <div class="group-panel">
+                    <div><input id="selectCheckbox" class="need-forbidden" type="checkbox" onchange="toggleSelectable()" /><span>选择区域</span></div>
+                    <div style="margin-top: 5px;">
+                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(0, -1)">←</button>
+                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(0, 1)">→</button>
+                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(-1, 0)">↑</button>
+                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(1, 0)">↓</button>
+                    </div>
+                    <div style="margin-top: 5px;">
+                        <button class="need-forbidden" style="width: 80px;" onclick="clearSelected()">清除选择</button>
+                        <button class="need-forbidden" style="width: 80px;" onclick="clearOthers()">清除其他</button>
+                    </div>
+                </div>
+                <div style="margin-top: 5px;">
+                    <input id="editCheckbox" class="need-forbidden" type="checkbox" onchange="toggleEditable()" /><span>启用编辑</span>
+                </div>
+                <div style="align-items: center; display: grid; padding: 5px;"><button class="need-forbidden" onclick="randomPoint()">随机</button></div>
             </div>
             <div class="group-panel">
                 <div><input id="edgeStyle" type="checkbox" checked="true" class="need-forbidden" /><span>周期边界</span></div>
@@ -147,19 +161,78 @@
                 const cellSize = 10; // 每个网格单元的大小
                 const canvas = document.getElementById('gridCanvas');
                 const ctx = canvas.getContext('2d');
+                const aliveColor = 'black';
+                const emptyColor = 'white';
+                const selectedColor = '#ccffcc';
+                const bkColorArr = [ selectedColor ];
 
                 var conwaySpace = {};
                 var editable = false;
+                var selectDoing = false;
+
+                var selectedStartRow = -1;
+                var selectedEndRow = -1;
+                var selectedStartCol = -1;
+                var selectedEndCol = -1;
+
+                conwaySpace.getRange = () => {
+                    return {
+                        startRow: 0,
+                        endRow: rowCount - 1,
+                        startCol: 0,
+                        endCol: colCount - 1
+                    }
+                };
+
+                conwaySpace.getSelectedRange = () => {
+                    return {
+                        startRow: selectedStartRow,
+                        endRow: selectedEndRow,
+                        startCol: selectedStartCol,
+                        endCol: selectedEndCol
+                    };
+                }
                 
                 conwaySpace.enableEdit = () => { editable = true; }
                 conwaySpace.disableEdit = () => { editable = false; }
+                conwaySpace.enableSelect = () => { selectDoing = true; }
+                conwaySpace.disableSelect = () => { 
+                    selectDoing = false;
+                    selectedStartRow = -1;
+                    selectedEndRow = -1;
+                    selectedStartCol = -1;
+                    selectedEndCol = -1;
+                    for(let r = 0; r < conwaySpace.backgroupGrid.length; r++){
+                        let rows = conwaySpace.backgroupGrid[r];
+                        for(let c = 0; c < rows.length; c++){
+                            if(rows[c] == 1 && conwaySpace.gridMarks[r][c] == 0){
+                                conwaySpace.removePoint(r, c);
+                            }
+                        }
+                    }
+                }
+
+                function isInSelect(r, c){
+                    return r >= selectedStartRow && r <= selectedEndRow && c >= selectedStartCol && c <= selectedEndCol;
+                }
                 
+                function isSelectRangeExist(){
+                    return selectedStartRow >= 0 && selectedEndRow >= 0 && selectedStartCol >= 0 && selectedEndCol >= 0;
+                }
+
                 conwaySpace.draw = function(rc, cc){
                     rowCount = rc;
                     colCount = cc;
                     conwaySpace.gridMarks = Array.from({ length: rowCount }, () => 
                         Array(colCount).fill(0)
                     );
+                    conwaySpace.backgroupGrid = Array.from({ length: rowCount }, () => 
+                        Array(colCount).fill(0)
+                    );
+                    selectedStartRow = -1;
+                    selectedEndRow = -1;
+                    selectedStartCol = -1;
+                    selectedEndCol = -1;
                     
                     canvas.width = colCount * cellSize;
                     canvas.height = rowCount * cellSize;
@@ -167,6 +240,7 @@
                     // 设置线条样式
                     ctx.strokeStyle = '#ccc'; // 灰色线条
                     ctx.lineWidth = 1;
+                    ctx.imageSmoothingEnabled = false;
             
                     // 绘制垂直线
                     for (let x = 0; x <= colCount; x += 1) {
@@ -188,19 +262,35 @@
                 
                 // 涂黑格子, 坐标从(0, 0)开始
                 conwaySpace.drawPoint = function(row, col){
+                    conwaySpace.gridMarks[row][col] = 1;
+                    brushPointWithColor(row, col, aliveColor);
+                }
+
+                // 反转一个细胞的存活状态
+                conwaySpace.invertPointStatus = function(row, col){
+                    if(conwaySpace.gridMarks[row][col] == 1){
+                        conwaySpace.removePoint(row, col);
+                    }else{
+                        conwaySpace.drawPoint(row, col);
+                    }
+                }
+
+                function brushPointWithColor(row, col, color){
                     // 计算目标格子的左上角坐标
                     const startX = col * cellSize + 1;
                     const startY = row * cellSize + 1;
                     // 绘制黑色矩形覆盖目标格子
-                    ctx.fillStyle = 'black'; // 设置填充颜色为黑色
+                    ctx.fillStyle = color; // 设置填充颜色为黑色
                     ctx.fillRect(startX, startY, cellSize - 2, cellSize - 2); // 绘制矩形
                 }
 
                 conwaySpace.removePoint = function(row, col){
-                    // 计算目标格子的左上角坐标
-                    const startX = col * cellSize + 1;
-                    const startY = row * cellSize + 1;
-                    ctx.clearRect(startX, startY, cellSize - 2, cellSize - 2);
+                    conwaySpace.gridMarks[row][col] = 0;
+                    if(isInSelect(row, col)){
+                        brushPointWithColor(row, col, selectedColor);
+                    }else{
+                        brushPointWithColor(row, col, emptyColor);
+                    }
                 }
 
                 // 清空画布
@@ -230,7 +320,74 @@
                             conwaySpace.drawPoint(clickedRow, clickedCol);
                         }else{
                             conwaySpace.removePoint(clickedRow, clickedCol);
+                            if(isInSelect(clickedRow, clickedCol)){
+                                brushPointWithColor(clickedRow, clickedCol, selectedColor);
+                            }
                         }
+                    }
+                });
+
+                var startSelectRowNum = -1;
+                var startSelectColNum = -1;
+                canvas.addEventListener('mousedown', (event) => {
+                    startSelectRowNum = -1;
+                    endSelectColNum = -1;
+                    if(!selectDoing){
+                        return;
+                    }
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
+                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
+
+                    // 计算点击的行列号
+                    const clickedRow = Math.floor(mouseY / cellSize);
+                    const clickedCol = Math.floor(mouseX / cellSize);
+
+                    // 检查是否在有效范围内
+                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
+                        startSelectRowNum = clickedRow;
+                        startSelectColNum = clickedCol;
+                    }
+                });
+
+                canvas.addEventListener('mouseup', (event) => {
+                    if(!selectDoing || startSelectRowNum < 0 || startSelectColNum < 0){
+                        return;
+                    }
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
+                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
+
+                    // 计算点击的行列号
+                    const clickedRow = Math.floor(mouseY / cellSize);
+                    const clickedCol = Math.floor(mouseX / cellSize);
+
+                    if(clickedRow == startSelectRowNum && clickedCol == startSelectColNum){ return; }
+
+                    // 检查是否在有效范围内
+                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
+                        selectedStartRow = Math.min(clickedRow, startSelectRowNum);
+                        selectedEndRow = Math.max(clickedRow, startSelectRowNum);
+                        selectedStartCol = Math.min(clickedCol, startSelectColNum);
+                        selectedEndCol = Math.max(clickedCol, startSelectColNum);
+
+                        // 选中区域染色
+                        for(let r = 0; r < conwaySpace.backgroupGrid.length; r++){
+                            let rows = conwaySpace.backgroupGrid[r];
+                            for(let c = 0; c < rows.length; c++){
+                                let isAlivePoint = conwaySpace.gridMarks[r][c] == 1;
+                                if(isInSelect(r, c)){
+                                    conwaySpace.backgroupGrid[r][c] = 1;
+                                    if(!isAlivePoint) { brushPointWithColor(r, c, selectedColor); }
+                                }else{
+                                    conwaySpace.backgroupGrid[r][c] = 0;
+                                    if(!isAlivePoint) { conwaySpace.removePoint(r, c); }
+                                }
+                            }
+                        }
+                    }else{
+                        startSelectRowNum = -1;
+                        startSelectColNum = -1;
                     }
                 });
 
@@ -293,22 +450,31 @@
                             }
 
                             if(m == 1){
-                                if(liveNeighbor < 2 || liveNeighbor > 3){ // 死亡规则
-                                    conwaySpace.removePoint(r, c);
-                                }else{
+                                if(liveNeighbor == 2 || liveNeighbor == 3){ // 存活规则
                                     newMarkMap[r][c] = 1;
+                                }else{ // 死亡
+                                    newMarkMap[r][c] = 0;
                                 }
-                                // 存活
                             }else{
                                 if(liveNeighbor == 3){  // 出生规则
                                     newMarkMap[r][c] = 1;
-                                    conwaySpace.drawPoint(r, c);
                                 }
                             }
                         }
                     }
 
-                    conwaySpace.gridMarks = newMarkMap;
+                    for(let r = 0; r < rowCount; r++){
+                        for(let c = 0; c < colCount; c++){
+                            let m = newMarkMap[r][c];
+                            if(m != conwaySpace.gridMarks[r][c]){
+                                if(m == 0){
+                                    conwaySpace.removePoint(r, c);
+                                }else{
+                                    conwaySpace.drawPoint(r, c);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 conwaySpace.dump = function(){
@@ -323,14 +489,17 @@
                 }
 
                 function refreshPoint(){
-                    let mr = conwaySpace.gridMarks.length;
-                    for(let r = 0; r < mr; r++){
-                        let mc = conwaySpace.gridMarks[r].length;
-                        for(let c = 0; c < mc; c++){
+                    for(let r = 0; r < rowCount; r++){
+                        for(let c = 0; c < colCount; c++){
                             if(conwaySpace.gridMarks[r][c] == 1){
                                 conwaySpace.drawPoint(r, c);
                             }else{
-                                conwaySpace.removePoint(r, c);
+                                let bv = conwaySpace.backgroupGrid[r][c];
+                                if(bv > 0){
+                                    brushPointWithColor(r, c, bkColorArr[bv - 1]);
+                                }else{
+                                    conwaySpace.removePoint(r, c);
+                                }
                             }
                         }
                     }
@@ -395,6 +564,67 @@
                     refreshPoint();
                 };
 
+                conwaySpace.moveSelected = (rowOffset, colOffset) => {
+                    if((rowOffset == 0 && colOffset == 0) || !isSelectRangeExist()){ return; }
+                    
+                    let newBackgroupGrid = Array.from({ length: rowCount }, () => 
+                        Array(colCount).fill(0)
+                    );
+                    let newGridMarks = Array.from({ length: rowCount }, () => 
+                        Array(colCount).fill(0)
+                    );
+                    for(let r = selectedStartRow; r <= selectedEndRow; r++){
+                        for(let c = selectedStartCol; c <= selectedEndCol; c++){
+                            let nr = r + rowOffset;
+                            let nc = c + colOffset;
+                            if(nr >= 0 && nr < rowCount && nc >= 0 && nc < colCount){
+                                newBackgroupGrid[nr][nc] = 1;
+                                newGridMarks[nr][nc] = conwaySpace.gridMarks[r][c];
+                            }
+                        }
+                    }
+
+                    for(let r = 0; r < rowCount; r++){
+                        for(let c = 0; c < colCount; c++){
+                            if(newBackgroupGrid[r][c] == 1){ // 选区中
+                                conwaySpace.backgroupGrid[r][c] = 1;
+                                conwaySpace.gridMarks[r][c] = newGridMarks[r][c];
+                            }else if(conwaySpace.backgroupGrid[r][c] == 1){
+                                conwaySpace.backgroupGrid[r][c] = 0;
+                                conwaySpace.gridMarks[r][c] = 0;
+                            }
+                        }
+                    }
+                    selectedStartRow += rowOffset;
+                    selectedEndRow += rowOffset;
+                    selectedStartCol += colOffset;
+                    selectedEndCol += colOffset;
+                    if((selectedStartCol < 0 && selectedEndCol < 0) 
+                        || (selectedStartRow < 0 && selectedEndRow < 0)
+                        || (selectedStartCol >= colCount && selectedEndCol >= colCount)
+                        || (selectedStartRow >= rowCount && selectedEndRow >= rowCount)
+                    ){ // 整个选区超出范
+                        selectedStartRow = -1;
+                        selectedEndRow = -1;
+                        selectedStartCol = -1;
+                        selectedEndCol = -1;
+                    }else{
+                        if(selectedStartRow < 0){ selectedStartRow = 0; }
+                        else if(selectedStartRow >= rowCount){ selectedStartRow = rowCount - 1; }
+                        
+                        if(selectedEndRow < 0){ selectedEndRow = 0; }
+                        else if(selectedEndRow >= rowCount){ selectedEndRow = rowCount - 1; }
+
+                        if(selectedStartCol < 0){ selectedStartCol = 0; }
+                        else if(selectedStartCol >= colCount){ selectedStartCol = colCount - 1; }
+                        
+                        if(selectedEndCol < 0){ selectedEndCol = 0; }
+                        else if(selectedEndCol >= colCount){ selectedEndCol = colCount - 1; }
+                    }
+
+                    refreshPoint();
+                };
+
                 return conwaySpace;
             }
 
@@ -434,6 +664,14 @@
                 }
             }
 
+            function toggleSelectable(){
+                if(document.getElementById('selectCheckbox').checked && !document.getElementById('selectCheckbox').disabled){
+                    conwaySpace.enableSelect();
+                }else{
+                    conwaySpace.disableSelect();
+                }
+            }
+
             function next(){
                 conwaySpace.next(document.getElementById('edgeStyle').checked);
             }
@@ -453,6 +691,7 @@
                     }
 
                     toggleEditable();
+                    toggleSelectable()
                     document.getElementById('runBtn').innerText = '运行';
                 }else{
                     let p = document.getElementById('speed').value;
@@ -467,6 +706,7 @@
                         c.disabled = true;
                     }
                     toggleEditable();
+                    toggleSelectable();
                     document.getElementById('runBtn').innerText = '停止';
 
                     var period = document.getElementById('edgeStyle').checked;
@@ -540,6 +780,53 @@
                 let index = Number(document.getElementById("demoSelect").value) - 1;
                 if(index >= 0){
                     conwaySpace.read(demoArr[index]);
+                }
+            }
+
+            function moveSelected(rowOffset, colOffsset){
+                conwaySpace.moveSelected(rowOffset, colOffsset);
+            }
+
+            function randomPoint(){
+                let selectedRange = conwaySpace.getSelectedRange();
+                let randomRange;
+                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
+                    randomRange = selectedRange;
+                }else{
+                    randomRange = conwaySpace.getRange();
+                }
+
+                for(let r = randomRange.startRow; r <= randomRange.endRow; r++){
+                    for(let c = randomRange.startCol; c <= randomRange.endCol; c++){
+                        if(Math.random() >= 0.5){
+                            conwaySpace.invertPointStatus(r, c);
+                        }
+                    }
+                }
+            }
+
+            function clearSelected(){
+                let selectedRange = conwaySpace.getSelectedRange();
+                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
+                    for(let r = selectedRange.startRow; r <= selectedRange.endRow; r++){
+                        for(let c = selectedRange.startCol; c <= selectedRange.endCol; c++){
+                            conwaySpace.removePoint(r, c);
+                        }
+                    }
+                }
+            }
+
+            function clearOthers(){
+                let selectedRange = conwaySpace.getSelectedRange();
+                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
+                    let totalRange = conwaySpace.getRange();
+                    for(let r = totalRange.startRow; r <= totalRange.endRow; r++){
+                        for(let c = totalRange.startCol; c <= totalRange.endCol; c++){
+                            if(r < selectedRange.startRow || r > selectedRange.endRow || c < selectedRange.startCol || c > selectedRange.endCol){
+                                conwaySpace.removePoint(r, c);
+                            }
+                        }
+                    } 
                 }
             }
         </script>
