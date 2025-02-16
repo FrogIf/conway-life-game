@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Conway's Game of Life</title>
+        <style>
+            .eye-button{
+                width: 15px;
+                height: 15px;
+                cursor: pointer;
+            }
+            .eye-button span{
+                width: 2px;
+                height: 2px;
+                position: absolute;
+            }
+            .eye-button span:nth-of-type(1){
+                right: 20%;
+                top: 20%;
+                background-color: #009E60;
+            }
+            .eye-button span:nth-of-type(2){
+                right: 50%;
+                top: 20%;
+                background-color: #FF5800;
+            }
+            .eye-button span:nth-of-type(3){
+                right: 80%;
+                top: 20%;
+                background-color: #FFD500;
+            }
+            .eye-button span:nth-of-type(4){
+                right: 20%;
+                top: 50%;
+                background-color: #C41E3A;
+            }
+            .eye-button span:nth-of-type(5){
+                right: 50%;
+                top: 50%;
+                background-color: #FFFFFF;
+            }
+            .eye-button span:nth-of-type(6){
+                right: 80%;
+                top: 50%;
+                background-color: #0051BA;
+            }
+            .eye-button span:nth-of-type(7){
+                right: 20%;
+                top: 80%;
+                background-color: #FFD500;
+            }
+            .eye-button span:nth-of-type(8){
+                right: 50%;
+                top: 80%;
+                background-color: #FF5800;
+            }
+            .eye-button span:nth-of-type(9){
+                right: 80%;
+                top: 80%;
+                background-color: #009E60;
+            }
+            .right-control-panel{
+                right: 10px;
+                top: 0px;
+                position: absolute;
+                width: 200px;
+                height: 475px;
+                border-radius: 5px;
+                background-color: rgba(191,191,191,0.4);
+                padding: 10px 10px;
+            }
+            .group-panel{
+                border: 1px solid gray; 
+                border-radius: 5px; 
+                padding: 5px; 
+                margin-top: 5px;
+            }
+        </style>
+	</head>
+	<body>
+        <canvas id="gridCanvas" style="cursor: pointer;"></canvas>
+        <div id="menuBtn" class="eye-button" style="position:absolute;right:0px;top:0px;">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div id="menuPanel" class="right-control-panel">
+            <div class="group-panel">
+                <div><div style="width: 80px;display: inline-block;">行数(row):</div><input id="rowCount" type="number" style="width: 80px;" value="50" ></div>
+                <div><div style="width: 80px;display: inline-block;">列数(col):</div><input id="colCount" type="number" style="width: 80px;" value="100"></div>
+                <div style="align-items: center; display: grid; padding: 5px;">
+                    <button class="need-forbidden" onclick="reDraw()">重绘</button>
+                </div>
+                <div style="align-items: center; padding: 5px;">
+                    <div>
+                        <div style="width: 20px;display: inline-block;">←</div>
+                        <input id="leftExtCount" type="number" style="width: 50px;" value="0" >
+                        <div style="width: 20px;display: inline-block;">↑</div>
+                        <input id="topExtCount" type="number" style="width: 50px;" value="0" >
+                    </div>
+                    <div>
+                        <div style="width: 20px;display: inline-block;">→</div>
+                        <input id="rightExtCount" type="number" style="width: 50px;" value="0" >
+                        <div style="width: 20px;display: inline-block;">↓</div>
+                        <input id="bottomExtCount" type="number" style="width: 50px;" value="0" >
+                    </div>
+                    <div style="align-items: right;">
+                        <button style="position:relative; right: -134px; top: 5px;" class="need-forbidden" onclick="extend()">扩展</button>
+                    </div>
+                </div>
+            </div>
+            <div class="group-panel">
+                <div><input id="editCheckbox" class="need-forbidden" type="checkbox" onchange="toggleEditable()" /><span>编辑点</span></div>
+            </div>
+            <div class="group-panel">
+                <div><input id="edgeStyle" type="checkbox" checked="true" class="need-forbidden" /><span>周期边界</span></div>
+                <div>速度: <input id="speed" class="need-forbidden" value="200" type="number" style="width: 50px;">ms/step</div>
+                <div style="align-items: center; display: grid; padding: 5px; display: inline-block;">
+                    <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
+                    <button id="runBtn" onclick="run()">运行</button>
+                </div>
+            </div>
+            <div class="group-panel">
+                <div>
+                    <div style="align-items: center; display: grid; padding: 5px;"><button class="need-forbidden" onclick="dump()">下载</button></div>
+                </div>
+                <div class="group-panel">
+                    加载: <input class="need-forbidden" type="file" id="fileInput" accept=".cl">
+                </div>
+                <div>
+                    示例: 
+                    <select id="demoSelect">
+                        <option value="0" selected>无</option>
+                        <option value="1">稳定结构1</option>
+                        <option value="2">稳定结构2</option>
+                        <option value="3">振荡器1</option>
+                        <option value="4">振荡器2</option>
+                        <option value="5">滑翔机1</option>
+                        <option value="6">滑翔机2</option>
+                        <option value="7">高斯帕机枪</option>
+                    </select>
+                    <div style="align-items: center; display: grid; padding: 5px;"><button id="demoBtn" class="need-forbidden" onclick="drawDemo()">绘制</button></div>
+                </div>
+            </div>
+        </div>
+        <script>
+            // 这里行用width指定
+            function makeConwaySpace(rowCount, colCount){
+                const cellSize = 10; // 每个网格单元的大小
+                const canvas = document.getElementById('gridCanvas');
+                const ctx = canvas.getContext('2d');
+
+                var conwaySpace = {};
+                var editable = false;
+                
+                conwaySpace.enableEdit = () => { editable = true; }
+                conwaySpace.disableEdit = () => { editable = false; }
+                
+                conwaySpace.draw = function(rc, cc){
+                    rowCount = rc;
+                    colCount = cc;
+                    conwaySpace.gridMarks = Array.from({ length: rowCount }, () => 
+                        Array(colCount).fill(0)
+                    );
+                    
+                    canvas.width = colCount * cellSize;
+                    canvas.height = rowCount * cellSize;
+            
+                    // 设置线条样式
+                    ctx.strokeStyle = '#ccc'; // 灰色线条
+                    ctx.lineWidth = 1;
+            
+                    // 绘制垂直线
+                    for (let x = 0; x <= colCount; x += 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(x * cellSize, 0);
+                        ctx.lineTo(x * cellSize, rowCount * cellSize);
+                        ctx.stroke();
+                    }
+                    // 绘制水平线
+                    for (let y = 0; y <= rowCount; y += 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y * cellSize);
+                        ctx.lineTo(colCount * cellSize, y * cellSize);
+                        ctx.stroke();
+                    }
+                }
+
+                conwaySpace.draw(rowCount, colCount);
+                
+                // 涂黑格子, 坐标从(0, 0)开始
+                conwaySpace.drawPoint = function(row, col){
+                    // 计算目标格子的左上角坐标
+                    const startX = col * cellSize + 1;
+                    const startY = row * cellSize + 1;
+                    // 绘制黑色矩形覆盖目标格子
+                    ctx.fillStyle = 'black'; // 设置填充颜色为黑色
+                    ctx.fillRect(startX, startY, cellSize - 2, cellSize - 2); // 绘制矩形
+                }
+
+                conwaySpace.removePoint = function(row, col){
+                    // 计算目标格子的左上角坐标
+                    const startX = col * cellSize + 1;
+                    const startY = row * cellSize + 1;
+                    ctx.clearRect(startX, startY, cellSize - 2, cellSize - 2);
+                }
+
+                // 清空画布
+                conwaySpace.clear = function(){
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+
+                canvas.addEventListener('click', (event) => {
+                    if(!editable){
+                        return;
+                    }
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
+                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
+
+                    // 计算点击的行列号
+                    const clickedRow = Math.floor(mouseY / cellSize);
+                    const clickedCol = Math.floor(mouseX / cellSize);
+
+                    // 检查是否在有效范围内
+                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
+                        // 切换颜色逻辑
+                        let currentMark = conwaySpace.gridMarks[clickedRow][clickedCol];
+                        conwaySpace.gridMarks[clickedRow][clickedCol] = 1 - currentMark;
+
+                        if(currentMark == 0){ // 原来是白色, 需要涂黑
+                            conwaySpace.drawPoint(clickedRow, clickedCol);
+                        }else{
+                            conwaySpace.removePoint(clickedRow, clickedCol);
+                        }
+                    }
+                });
+
+                conwaySpace.next = (period) => {
+                    let newMarkMap = Array.from({ length: rowCount }, () => 
+                        Array(colCount).fill(0)
+                    );
+
+                    let mr = conwaySpace.gridMarks.length;
+                    for(let r = 0; r < mr; r++){
+                        let mc = conwaySpace.gridMarks[r].length;
+                        for(let c = 0; c < mc; c++){
+                            let m = conwaySpace.gridMarks[r][c];
+
+                            let liveNeighbor = 0;
+                            if(period){ // 周期边界
+                                let r0 = r - 1; // 上一行
+                                if(r0 < 0){ r0 = mr - 1; }
+
+                                let r1 = r + 1; // 下一行
+                                if(r1 >= mr){ r1 = 0; }
+
+                                let c0 = c - 1; // 前一列
+                                if(c0 < 0){ c0 = mc - 1; }
+                                
+                                let c1 = c + 1; // 后一列
+                                if(c1 >= mc){ c1 = 0; }
+
+                                if(conwaySpace.gridMarks[r0][c0] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r0][c] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r0][c1] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r][c0] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r][c1] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r1][c0] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r1][c] == 1){ liveNeighbor++; }
+                                if(conwaySpace.gridMarks[r1][c1] == 1){ liveNeighbor++; }
+                            }else{
+                                liveNeighbor = 8;
+
+                                let c0 = c - 1; // 前一列
+                                let c1 = c + 1; // 后一列
+                                if(c0 < 0 || conwaySpace.gridMarks[r][c0] == 0){ liveNeighbor--; }
+                                if(c1 >= mc || conwaySpace.gridMarks[r][c1] == 0){ liveNeighbor--; }
+
+                                let r0 = r - 1; // 上一行
+                                if(r0 < 0){ liveNeighbor -= 3; }
+                                else{
+                                    if(c0 < 0 || conwaySpace.gridMarks[r0][c0] == 0){ liveNeighbor--; }
+                                    if(c1 >= mc || conwaySpace.gridMarks[r0][c1] == 0){ liveNeighbor--; }
+                                    if(conwaySpace.gridMarks[r0][c] == 0){ liveNeighbor--; }
+                                }
+
+                                let r1 = r + 1; // 下一行
+                                if(r1 >= mr){ liveNeighbor -= 3; }
+                                else{
+                                    if(c0 < 0 || conwaySpace.gridMarks[r1][c0] == 0){ liveNeighbor--; }
+                                    if(c1 >= mc || conwaySpace.gridMarks[r1][c1] == 0){ liveNeighbor--; }
+                                    if(conwaySpace.gridMarks[r1][c] == 0){ liveNeighbor--; }
+                                }
+                            }
+
+                            if(m == 1){
+                                if(liveNeighbor < 2 || liveNeighbor > 3){ // 死亡规则
+                                    conwaySpace.removePoint(r, c);
+                                }else{
+                                    newMarkMap[r][c] = 1;
+                                }
+                                // 存活
+                            }else{
+                                if(liveNeighbor == 3){  // 出生规则
+                                    newMarkMap[r][c] = 1;
+                                    conwaySpace.drawPoint(r, c);
+                                }
+                            }
+                        }
+                    }
+
+                    conwaySpace.gridMarks = newMarkMap;
+                }
+
+                conwaySpace.dump = function(){
+                    let mr = conwaySpace.gridMarks.length;
+                    let dumpContent = "";
+                    for(let r = 0; r < mr; r++){
+                        if(r > 0){ dumpContent += '\n'; }
+                        let mc = conwaySpace.gridMarks[r].length;
+                        dumpContent += conwaySpace.gridMarks[r].join(',');
+                    }
+                    return dumpContent;
+                }
+
+                function refreshPoint(){
+                    let mr = conwaySpace.gridMarks.length;
+                    for(let r = 0; r < mr; r++){
+                        let mc = conwaySpace.gridMarks[r].length;
+                        for(let c = 0; c < mc; c++){
+                            if(conwaySpace.gridMarks[r][c] == 1){
+                                conwaySpace.drawPoint(r, c);
+                            }else{
+                                conwaySpace.removePoint(r, c);
+                            }
+                        }
+                    }
+                }
+
+                conwaySpace.read = function(origin){
+                    let rows = origin.split('\n');
+                    let newRowCount = rows.length;
+                    let newColCount = 0;
+                    let marks = new Array();
+                    for(let row of rows){
+                        let arr = [];
+                        let cols = row.split(',');
+                        if(newColCount < cols.length){
+                            newColCount = cols.length;
+                        }
+                        for(let col of cols){
+                            arr.push(col == '1' ? 1 : 0);
+                        }
+                        marks.push(arr);
+                    }
+                    conwaySpace.clear();
+
+                    // 如果原有画布比导入的画布大, 保留原有画布尺寸
+                    let expand = false;
+                    if(newColCount < colCount){ newColCount = colCount; expand = true; }
+                    if(newRowCount < rowCount){ newRowCount = rowCount; expand = true; }
+                    conwaySpace.draw(newRowCount, newColCount);
+
+                    if(expand){
+                        for(let r = 0; r < marks.length; r++){
+                            for(let c = 0; c < marks[r].length; c++){
+                                conwaySpace.gridMarks[r][c] = marks[r][c];
+                            }
+                        }
+                    }else{
+                        conwaySpace.gridMarks = marks;
+                    }
+
+                    refreshPoint();
+                }
+
+                conwaySpace.extend = (left, top, right, bottom) => {
+                    let newColCount = colCount + left + right;
+                    let newRowCount = rowCount + top + bottom;
+                    if(newColCount <= 0 || newRowCount <= 0){ return; }
+                    let newGrid = Array.from({ length: newRowCount }, () => 
+                        Array(newColCount).fill(0)
+                    );
+                    for(let r = 0; r < conwaySpace.gridMarks.length; r++){
+                        for(let c = 0; c < conwaySpace.gridMarks[r].length; c++){
+                            let tr = r + top;
+                            let tc = c + left;
+                            if(tr >= 0 && tr < newRowCount && tc >= 0 && tc < newColCount){
+                                newGrid[tr][tc] = conwaySpace.gridMarks[r][c];
+                            }
+                        }
+                    }
+                    conwaySpace.clear();
+                    conwaySpace.draw(newRowCount, newColCount);
+                    conwaySpace.gridMarks = newGrid;
+                    refreshPoint();
+                };
+
+                return conwaySpace;
+            }
+
+            document.getElementById("menuBtn").onclick = (e) => {
+                let panel = document.getElementById("menuPanel");
+                if(panel.style.display == "none"){
+                    panel.style.display = "block";
+                }else{
+                    panel.style.display = "none";
+                }
+            }
+
+            const conwaySpace = makeConwaySpace(Number(document.getElementById('rowCount').value), Number(document.getElementById('colCount').value));
+            
+            function reDraw(){
+                conwaySpace.clear();
+                conwaySpace.draw(Number(document.getElementById('rowCount').value), Number(document.getElementById('colCount').value));
+            }
+
+            function extend(){
+                let l = Number(document.getElementById('leftExtCount').value);
+                let r = Number(document.getElementById('rightExtCount').value);
+                let t = Number(document.getElementById('topExtCount').value);
+                let b = Number(document.getElementById('bottomExtCount').value);
+                conwaySpace.extend(l,t,r,b);
+                document.getElementById('leftExtCount').value = 0;
+                document.getElementById('rightExtCount').value = 0;
+                document.getElementById('topExtCount').value = 0;
+                document.getElementById('bottomExtCount').value = 0;
+            }
+
+            function toggleEditable(){
+                if(document.getElementById('editCheckbox').checked && !document.getElementById('editCheckbox').disabled){
+                    conwaySpace.enableEdit();
+                }else{
+                    conwaySpace.disableEdit();
+                }
+            }
+
+            function next(){
+                conwaySpace.next(document.getElementById('edgeStyle').checked);
+            }
+
+            var running = false;
+            var intervalId;
+            function run(){
+                if(running){
+                    if(intervalId){
+                        clearInterval(intervalId);
+                    }
+
+                    running = false;
+                    let controls = document.getElementsByClassName('need-forbidden');
+                    for(let c of controls){
+                        c.disabled = false;
+                    }
+
+                    toggleEditable();
+                    document.getElementById('runBtn').innerText = '运行';
+                }else{
+                    let p = document.getElementById('speed').value;
+                    if(p < 100){ 
+                        alert("速度太快"); 
+                        return;
+                    }
+
+                    running = true;
+                    let controls = document.getElementsByClassName('need-forbidden');
+                    for(let c of controls){
+                        c.disabled = true;
+                    }
+                    toggleEditable();
+                    document.getElementById('runBtn').innerText = '停止';
+
+                    var period = document.getElementById('edgeStyle').checked;
+
+                    intervalId = setInterval(() => {
+                        conwaySpace.next(period);
+                    }, p);
+                }
+            }
+
+            function dump(){
+                // 文件内容
+                let fileContent = conwaySpace.dump();
+
+                // 创建 Blob 对象
+                let blob = new Blob([fileContent], { type: "text/plain" });
+
+                // 生成文件 URL
+                let url = URL.createObjectURL(blob);
+
+                // 创建 <a> 标签并触发下载
+                let a = document.createElement("a");
+                a.href = url;
+                a.download = "dump.cl"; // 设置文件名
+                a.click();
+
+                // 释放 URL 对象
+                URL.revokeObjectURL(url);
+            }
+
+            document.getElementById('fileInput').addEventListener('change', (event) => {
+                const file = event.target.files[0]; // 获取用户选择的文件
+
+                if (file) {
+                    const reader = new FileReader();
+
+                    // 当文件读取完成时触发
+                    reader.onload = function (e) {
+                        const content = e.target.result; // 文件内容
+                        conwaySpace.read(content);
+                    };
+
+                    // 如果需要处理错误
+                    reader.onerror = function () {
+                        alert("文件读取出错");
+                    };
+
+                    // 开始读取文件
+                    reader.readAsText(file); // 读取为文本
+                }
+            });
+
+
+            let demoArr = [
+                // 稳定1-方块
+                "0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0\n0,0,0,1,1,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0",
+                // 稳定2-池塘
+                "0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0\n0,0,1,0,0,1,0,0\n0,0,1,0,0,1,0,0\n0,0,0,1,1,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0",
+                // 震荡1
+                "0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0",
+                // 震荡2
+                "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
+                // 滑翔机1
+                "0,0,1,0,0,0,0,0,0,0\n1,0,1,0,0,0,0,0,0,0\n0,1,1,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0",
+                // 滑翔机2
+                "0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,1,1,1,1,0,0,0,0\n0,1,0,0,0,1,0,0,0,0\n0,0,0,0,0,1,0,0,0,0\n0,1,0,0,1,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0",
+                // 高斯帕机枪
+                "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+            ];
+            function drawDemo(){
+                let index = Number(document.getElementById("demoSelect").value) - 1;
+                if(index >= 0){
+                    conwaySpace.read(demoArr[index]);
+                }
+            }
+        </script>
+	</body>
+</html>
