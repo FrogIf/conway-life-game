@@ -62,9 +62,9 @@
             .right-control-panel{
                 right: 10px;
                 top: 0px;
-                position: absolute;
+                position: fixed;
                 width: 200px;
-                height: 540px;
+                height: 590px;
                 border-radius: 5px;
                 background-color: rgba(191,191,191,0.4);
                 padding: 10px 10px;
@@ -79,7 +79,7 @@
 	</head>
 	<body>
         <canvas id="gridCanvas" style="cursor: pointer;"></canvas>
-        <div id="menuBtn" class="eye-button" style="position:absolute;right:0px;top:0px;">
+        <div id="menuBtn" class="eye-button" style="position:fixed;right:0px;top:0px;">
             <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
         <div id="menuPanel" class="right-control-panel">
@@ -691,7 +691,7 @@
                     }
 
                     toggleEditable();
-                    toggleSelectable()
+                    toggleSelectable();
                     document.getElementById('runBtn').innerText = '运行';
                 }else{
                     let p = document.getElementById('speed').value;
@@ -711,6 +711,7 @@
 
                     var period = document.getElementById('edgeStyle').checked;
 
+                    // setInterval使用的是任务队列, 如果内部耗时过长, 可能有队列积压的风险
                     intervalId = setInterval(() => {
                         conwaySpace.next(period);
                     }, p);
