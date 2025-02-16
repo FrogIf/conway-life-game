@@ -64,7 +64,7 @@
                 top: 0px;
                 position: fixed;
                 width: 200px;
-                height: 605px;
+                height: 575px;
                 border-radius: 5px;
                 background-color: rgba(191,191,191,0.4);
                 padding: 10px 10px;
@@ -102,31 +102,36 @@
                         <div style="width: 20px;display: inline-block;">↓</div>
                         <input id="bottomExtCount" type="number" style="width: 50px;" value="0" >
                     </div>
-                    <div style="align-items: right; margin-bottom: 10px;">
+                    <div style="align-items: right; margin-bottom: 5px;">
                         <button style="position:relative; right: -134px; top: 5px;" class="need-forbidden" onclick="extend()">扩展</button>
                     </div>
                 </div>
                 <div class="group-panel">
-                    <div><input id="selectCheckbox" class="need-forbidden" type="checkbox" onchange="toggleSelectable()" /><span>选择区域</span></div>
-                    <div style="margin-top: 5px;">
-                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(0, -1)">←</button>
-                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(0, 1)">→</button>
-                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(-1, 0)">↑</button>
-                        <button class="need-forbidden" style="width: 30px;" onclick="moveSelected(1, 0)">↓</button>
+                    <div>
+                        <label><input id="doNothing" class="need-forbidden" type="radio" checked name="editMode" onchange="toggleEditMode()"/>无</label>
+                        <label><input id="editPoint" class="need-forbidden" type="radio" name="editMode" onchange="toggleEditMode()"/>编辑点</label>
+                        <label><input id="selectRegion" class="need-forbidden" type="radio" name="editMode" onchange="toggleEditMode()" />框选</label>
                     </div>
                     <div style="margin-top: 5px;">
-                        <button class="need-forbidden" style="width: 80px;" onclick="clearSelected()">清除选择</button>
-                        <button class="need-forbidden" style="width: 80px;" onclick="clearOthers()">清除其他</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, -1)">←</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, 1)">→</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(-1, 0)">↑</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(1, 0)">↓</button>
+                    </div>
+                    <div style="margin-top: 5px;">
+                        <button class="need-forbidden select-control" style="width: 80px;" onclick="clearSelected()">清除选择</button>
+                        <button class="need-forbidden select-control" style="width: 80px;" onclick="clearOthers()">清除其他</button>
                     </div>
                 </div>
-                <div style="margin-top: 5px;">
-                    <input id="editCheckbox" class="need-forbidden" type="checkbox" onchange="toggleEditable()" /><span>启用编辑</span>
+                <div style="align-items: center; display: inline-block; padding: 5px;">
+                    <label for="randomSeed">种子:</label>
+                    <input id="randomSeed" type="number" style="width: 30px;" min="0" max="10" value="5" >
+                    <button class="need-forbidden" style="width: 60px; margin-left: 10px;" onclick="randomPoint()">随机</button>
                 </div>
-                <div style="align-items: center; display: grid; padding: 5px;"><button class="need-forbidden" onclick="randomPoint()">随机</button></div>
             </div>
             <div class="group-panel">
-                <div><input id="edgeStyle" type="checkbox" checked="true" class="need-forbidden" /><span>周期边界</span></div>
-                <div>速度: <input id="speed" class="need-forbidden" value="200" type="number" style="width: 50px;">ms/step</div>
+                <div><label><input id="edgeStyle" type="checkbox" checked="true" class="need-forbidden" />周期边界</label></div>
+                <div>速度: <input id="speed" class="need-forbidden" value="200" type="number" style="width: 50px;margin-right: 5px;margin-left: 5px;"><span>ms/step</span></div>
                 <div style="align-items: center; display: grid; padding: 5px; display: inline-block;">
                     <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
                     <button id="runBtn" onclick="run()">运行</button>
@@ -656,8 +661,13 @@
                 document.getElementById('bottomExtCount').value = 0;
             }
 
+            function toggleEditMode(){
+                toggleEditable();
+                toggleSelectable();
+            }
+
             function toggleEditable(){
-                if(document.getElementById('editCheckbox').checked && !document.getElementById('editCheckbox').disabled){
+                if(document.getElementById('editPoint').checked && !document.getElementById('editPoint').disabled){
                     conwaySpace.enableEdit();
                 }else{
                     conwaySpace.disableEdit();
@@ -665,10 +675,18 @@
             }
 
             function toggleSelectable(){
-                if(document.getElementById('selectCheckbox').checked && !document.getElementById('selectCheckbox').disabled){
+                if(document.getElementById('selectRegion').checked && !document.getElementById('selectRegion').disabled){
                     conwaySpace.enableSelect();
+                    let controls = document.getElementsByClassName('select-control');
+                    for(let c of controls){
+                        c.disabled = false;
+                    }
                 }else{
                     conwaySpace.disableSelect();
+                    let controls = document.getElementsByClassName('select-control');
+                    for(let c of controls){
+                        c.disabled = true;
+                    }
                 }
             }
 
@@ -690,8 +708,7 @@
                         c.disabled = false;
                     }
 
-                    toggleEditable();
-                    toggleSelectable();
+                    toggleEditMode();
                     document.getElementById('runBtn').innerText = '运行';
                 }else{
                     let p = document.getElementById('speed').value;
@@ -705,8 +722,7 @@
                     for(let c of controls){
                         c.disabled = true;
                     }
-                    toggleEditable();
-                    toggleSelectable();
+                    toggleEditMode();
                     document.getElementById('runBtn').innerText = '停止';
 
                     var period = document.getElementById('edgeStyle').checked;
@@ -788,6 +804,10 @@
                 conwaySpace.moveSelected(rowOffset, colOffsset);
             }
 
+            function getRandomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
             function randomPoint(){
                 let selectedRange = conwaySpace.getSelectedRange();
                 let randomRange;
@@ -797,9 +817,19 @@
                     randomRange = conwaySpace.getRange();
                 }
 
+                let min = Number(document.getElementById("randomSeed").min);
+                let max = Number(document.getElementById("randomSeed").max);
+                let seed = Number(document.getElementById("randomSeed").value);
+                if(seed > max){ 
+                    document.getElementById("randomSeed").value = max;
+                    seed = max;
+                }else if(seed < min){
+                    document.getElementById("randomSeed").value = min;
+                    seed = min;
+                }
                 for(let r = randomRange.startRow; r <= randomRange.endRow; r++){
                     for(let c = randomRange.startCol; c <= randomRange.endCol; c++){
-                        if(Math.random() >= 0.5){
+                        if(getRandomInt(min, max) >= seed){
                             conwaySpace.invertPointStatus(r, c);
                         }
                     }
@@ -830,6 +860,8 @@
                     } 
                 }
             }
+
+            toggleEditMode();
         </script>
 	</body>
 </html>
