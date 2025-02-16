@@ -829,7 +829,7 @@
                 }
                 for(let r = randomRange.startRow; r <= randomRange.endRow; r++){
                     for(let c = randomRange.startCol; c <= randomRange.endCol; c++){
-                        if(getRandomInt(min, max) >= seed){
+                        if(getRandomInt(min, max) <= seed){
                             conwaySpace.invertPointStatus(r, c);
                         }
                     }
