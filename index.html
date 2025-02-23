@@ -135,6 +135,7 @@
                 <div style="align-items: center; display: grid; padding: 5px; display: inline-block;">
                     <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
                     <button id="runBtn" onclick="run()">运行</button>
+                    <span id="stepCount" style="margin-left: 10px;">0</span>
                 </div>
             </div>
             <div class="group-panel">
@@ -630,6 +631,20 @@
                     refreshPoint();
                 };
 
+                var scale = 1;
+                conwaySpace.scale = (s) => {
+                    if(scale > 0){
+                        scale = s * scale;
+                    }else{
+                        scale = s / scale;
+                    }
+                    ctx.scale(scale, scale);
+                };
+
+                conwaySpace.getScale = () => {
+                    return scale;
+                };
+
                 return conwaySpace;
             }
 
@@ -728,7 +743,9 @@
                     var period = document.getElementById('edgeStyle').checked;
 
                     // setInterval使用的是任务队列, 如果内部耗时过长, 可能有队列积压的风险
+                    let cc = 0;
                     intervalId = setInterval(() => {
+                        document.getElementById("stepCount").innerText = ++cc;
                         conwaySpace.next(period);
                     }, p);
                 }
@@ -860,6 +877,24 @@
                     } 
                 }
             }
+
+            // 画布缩放
+            document.getElementById("gridCanvas").addEventListener('wheel', function(event){
+                event.preventDefault();
+                let dy = event.deltaY;
+                console.log(dy);
+                if(dy != 0){
+                    let scale = conwaySpace.getScale();
+                    if(dy < 0){
+                        scale = 1.05;
+                    }else{
+                        scale = -1.05;
+                    }
+                    if(scale < 3 && scale > 0.1){
+                        conwaySpace.scale(scale);
+                    }
+                }
+            });
 
             toggleEditMode();
         </script>
