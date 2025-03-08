@@ -5,6 +5,7 @@ function hashlife(){
     }
 
     const nodeCache = new Array(); // 二维数组, 第一个维度表示深度, 第二个维度存储节点Map
+    const emptyNodes = new Array(); // 没有存活节点的区域, index = depth
 
     function getKey(node){
         return node.ne._id +"_" + node.nw._id + "_" + node.se._id + "_" + node.sw._id;
@@ -19,6 +20,50 @@ function hashlife(){
         }
     }
 
+    /*
+     * 计算节点的中"最近"距离, 如果没有存活点, 则距离是边长
+     * r: 右边距离存活点的最近距离
+     * l: 左边距离存活点的最近距离
+     * t: 顶部距离存活点的最近距离
+     * b: 底部距离存活点的最近距离
+     */
+    function calculateNodeLiveEdge(node){
+        if(node.l != undefined) { return; }
+
+        if(node.depth == 1){
+            let v = 1 - (node.nw._id | node.sw._id);
+            node.l = v == 0 ? 0 : (2 - (node.ne._id | node.se._id));
+
+            v = 1 - (node.se._id | node.ne._id);
+            node.r = v == 0 ? 0 : (2 - (node.nw._id | node.sw._id));
+            
+            v = 1 - (node.ne._id | node.nw.nw._id);
+            node.t = v == 0 ? 0 : (2 - (node.se._id | node.sw._id));
+
+            v = 1 - (node.se._id | node.sw._id);
+            node.b = v == 0 ? 0 : (2 - (node.ne._id | node.nw._id));
+            return;
+        }
+        
+        calculateNodeLiveEdge(node.ne);
+        calculateNodeLiveEdge(node.nw);
+        calculateNodeLiveEdge(node.sw);
+        calculateNodeLiveEdge(node.se);
+
+        let halfSide = calculateSideLength(node.depth - 1);
+        let a = Math.min(node.nw.l, node.sw.l);
+        node.l = a == halfSide ? (halfSide + Math.min(node.ne.l, node.se.l)) : a;
+
+        a = Math.min(node.se.r, node.ne.r);
+        node.r = a == halfSide ? (halfSide + Math.min(node.nw.r, node.sw.r)) : a;
+        
+        a = Math.min(node.ne.t, node.nw.t);
+        node.t = a == halfSide ? (halfSide + Math.min(node.se.t, node.sw.t)) : a;
+
+        a = Math.min(node.se.b, node.sw.b);
+        node.b = a == halfSide ? (halfSide + Math.min(node.ne.b, node.nw.b)) : a;
+    }
+
     // 向缓存中添加节点
     function addToCache(node){
         let cacheNode = searchNodeFromCache(node);
@@ -31,12 +76,35 @@ function hashlife(){
 
         let nodeMap = nodeCache[node.depth - 1];
         node._id = idGenerate();
+        calculateNodeLiveEdge(node);
         nodeMap.set(k, node);
         return node;
     }
 
     const c0 = { depth: 0, _id: 0, ne: 0, nw: 0, se: 0, sw: 0 };
     const c1 = { depth: 0, _id: 1, ne: 1, nw: 1, se: 1, sw: 1 };
+    emptyNodes.push(c0);
+
+    function createEmptyNode(side){
+        if(side < 2){ return c0; }
+        side = nextPowerOfTwo(side); // 边长必须为2的幂次
+        let depth = calculateDepth(side);
+        if(depth < emptyNodes.length){
+            return emptyNodes[depth];
+        }else if(depth == emptyNodes.length){
+            let emp = emptyNodes[depth - 1];
+            let nn = addToCache({
+                depth: depth, ne: emp, nw: emp, se: emp, sw: emp
+            });
+            emptyNodes.push(nn);
+            return nn;
+        }else{
+            for(let d = emptyNodes.length; d <= depth; d++){
+                createEmptyNode(calculateSideLength(d));
+            }
+            return emptyNodes[depth];
+        }
+    }
 
     function initCache(){
         let firstMap = new Map();
@@ -94,30 +162,12 @@ function hashlife(){
     }
 
     /**
-     * 创建区域
-     * @param {*} direction 方位: 0-↖; 1-↗; 2-↙; 3-↘
-     * @param {*} side 边长
-     */
-    function createNode(side){
-        if(side < 2){ return c0; }
-        side = nextPowerOfTwo(side); // 边长必须为2的幂次
-        let nSide = side >> 1;
-        return addToCache({
-            nw: createNode(nSide),
-            ne: createNode(nSide),
-            sw: createNode(nSide),
-            se: createNode(nSide),
-            depth: calculateDepth(side) // 深度: 最小值为1, 即边长为2; 四个点对应深度1, 16个点对应深度2
-        });
-    }
-
-    /**
      * 扩充节点面积, 库充后边长newSide = side * 2 
      * @param {*} node 节点
      */
     function extendNode(node){
         let side = calculateSideLength(node.ne.depth)
-        let emptyNode = createNode(side);
+        let emptyNode = createEmptyNode(side);
 
         let ne = addToCache({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: emptyNode, sw: node.ne });
         let nw = addToCache({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: node.nw, sw: emptyNode });
@@ -128,19 +178,12 @@ function hashlife(){
     }
 
     
-    var root = createNode(4); // 初始状态只有四个点
+    var root = createEmptyNode(4); // 初始状态只有四个点
     const hl = {};
 
     function evolve(node, fastForward){ // 返回的是下一代的中心区域结果
-        let result;
-        if(fastForward){
-            result = node.ffEvolveResult;
-        }else{
-            result = node.evolveResult;
-        }
-        if(result){ 
-            return result;
-        }
+        let result = fastForward ? node.ffEvolveResult : node.evolveResult;
+        if(result){ return result; }
 
         if(node.depth == 2){  // 4 x 4
             let p0c = node.ne.nw._id + node.ne.ne._id + node.ne.se._id + node.se.ne._id + node.se.nw._id + node.sw.ne._id + node.nw.se._id + node.nw.ne._id;
@@ -291,11 +334,13 @@ function hashlife(){
             if(node.se._id == 1){ callback(centerX, centerY - 1); }
             if(node.sw._id == 1){ callback(centerX - 1, centerY - 1); }
         }else{
-            let offset = calculateSideLength(node.depth) >> 2;
-            traverse(node.ne, callback, centerX + offset, centerY + offset);
-            traverse(node.nw, callback, centerX - offset, centerY + offset);
-            traverse(node.se, callback, centerX + offset, centerY - offset);
-            traverse(node.sw, callback, centerX - offset, centerY - offset);
+            let side = calculateSideLength(node.depth);
+            let halfSide = side >> 1;
+            let offset = side >> 2;
+            if(halfSide != node.ne.l){ traverse(node.ne, callback, centerX + offset, centerY + offset); }
+            if(halfSide != node.nw.l){ traverse(node.nw, callback, centerX - offset, centerY + offset); }
+            if(halfSide != node.se.l){ traverse(node.se, callback, centerX + offset, centerY - offset); }
+            if(halfSide != node.sw.l){ traverse(node.sw, callback, centerX - offset, centerY - offset); }
         }
     }
 
@@ -348,6 +393,15 @@ function hashlife(){
      * @param {是否快进} fastForward 
      */
     hl.nextGenerate = function(fastForward){
+        // 1. 区域扩展, 生命游戏中的光速是, 1步一格
+        // 2. 获取存活最大值
+        if(fastForward){
+
+        }else{
+            if(root.l == 0 || root.r == 0 || root.t == 0 || root.b == 4){
+                root = extendNode(root);
+            }
+        }
         root = evolve(extendNode(root), fastForward);
     }
 
@@ -362,7 +416,7 @@ function hashlife(){
      * 清除画布
      */
     hl.clear = function(){
-        root = createNode(4);
+        root = createEmptyNode(4);
     }
 
     /**
@@ -379,43 +433,8 @@ function hashlife(){
     hl.test = function(){
         root = extendNode(root);
         console.log(root);
+        // console.log(nodeCache);
     }
 
     return hl;
 }
-
-
-// function updatePoint(node, x, y, mark){
-//     let direction = (x < 0 ? 1 : 0) | ((y < 0 ? 1 : 0) << 1);
-//     if(node.depth == 1){
-//         let cMark = mark == 0 ? c0 : c1;
-//         if(direction == 0){
-//             return addToCache({ depth: 1, ne: cMark, nw: node.nw, se: node.se, sw: node.sw });
-//         }else if(direction == 1){
-//             return addToCache({ depth: 1, ne: node.ne, nw: cMark, se: node.se, sw: node.sw });
-//         }else if(direction == 2){
-//             return addToCache({ depth: 1, ne: node.ne, nw: node.nw, se: cMark, sw: node.sw });
-//         }else{
-//             return addToCache({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: cMark });
-//         }
-//     }else {
-//         let offset = calculateSideLength(node.depth) >> 2;
-//         if(direction == 0){
-//             return addToCache({
-//                 depth: node.depth, ne: updatePoint(node.ne, x - offset, y - offset, mark), nw: node.nw, se: node.se, sw: node.sw
-//             });
-//         }else if(direction == 1){
-//             return addToCache({
-//                 depth: node.depth, ne: node.ne, nw: updatePoint(node.nw, x + offset, y - offset, mark), se: node.se, sw: node.sw
-//             });
-//         }else if(direction == 2){
-//             return addToCache({
-//                 depth: node.depth, ne: node.ne, nw: node.nw, se: updatePoint(node.se, x - offset, y + offset, mark), sw: node.sw
-//             });
-//         }else{
-//             return addToCache({
-//                 depth: node.depth, ne: node.ne, nw: node.nw, se: node.se, sw: updatePoint(node.sw, x + offset, y + offset, mark)
-//             });
-//         }
-//     }
-// }
