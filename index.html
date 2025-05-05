@@ -14,6 +14,12 @@
         </div>
         <div id="menuPanel" class="right-control-panel">
             <div class="group-panel">
+                <div>
+                    规则: 
+                    <input id="ruleB" class="need-forbidden" title="3" value="3" type="number" style="width: 50px;margin-left: 5px;">
+                    <span>/</span>
+                    <input id="ruleS" class="need-forbidden" title="23" value="23" type="number" style="width: 50px;">
+                </div>
                 <div>速度: <input id="speed" class="need-forbidden" value="100" type="number" style="width: 50px;margin-right: 15px;margin-left: 5px;"><span>ms/step</span></div>
                 <div style="align-items: center; display: grid; padding: 5px 0px; display: inline-block;">
                     <label><input id="fastForward" type="checkbox" class="need-forbidden" />快进</label>
@@ -88,13 +94,6 @@
             function enableSwitch(dom){
                 dom.setAttribute('data-enabled', 'true');
             }
-            document.getElementById('editToggleSwitch').addEventListener('change', function() {
-                if (this.checked) {
-                    console.log('开关打开');
-                } else {
-                    console.log('开关关闭');
-                }
-            });
             document.getElementById("menuBtn").onclick = (e) => {
                 let panel = document.getElementById("menuPanel");
                 if(panel.style.display == "none"){
@@ -297,7 +296,9 @@
             }
 
             function nextStep(fastForward){
-                hl.nextGenerate(fastForward);
+                let b = document.getElementById('ruleB').value;
+                let s = document.getElementById('ruleS').value;
+                hl.nextGenerate(fastForward, "B" + b + "/S" + s);
                 conwaySpace.render();
             }
 
@@ -395,6 +396,7 @@
                 let hArr = header.split(',');
                 let col = 0;
                 let row = 0;
+                let rule = '';
                 for(let j = 0; j < hArr.length; j++){
                     let h = hArr[j];
                     if(h.startsWith('x=')){
@@ -402,10 +404,22 @@
                     }else if(h.startsWith('y=')){
                         row = parseInt(h.substring(2, h.length));
                     }else if(h.startsWith('rule=')){
-                        // 规则, 忽略
+                        rule = h.substring(5, h.length);
                     }
                 }
                 i++;
+
+                if(rule.length > 0){ // 解析规则
+                    let arr = rule.split('/');
+                    let bexp = arr[0];
+                    let sexp = arr[1];
+                    let bb = bexp.substring(1, bexp.length);
+                    let ss = sexp.substring(1, sexp.length);
+                    document.getElementById('ruleB').value = bb;
+                    document.getElementById('ruleB').title = bb;
+                    document.getElementById('ruleS').value = ss;
+                    document.getElementById('ruleS').title = ss;
+                }
 
                 // 读取数据
                 let x = 0;
@@ -486,10 +500,11 @@
                     arr[y - minY][x - minX] = 1;
                 });
 
+                let ruleExp = 'B' + document.getElementById('ruleB').value + '/S' + document.getElementById('ruleS').value;
 
                 // 生成rle
                 dumpContent = "#C generate by conway-life-game\n";
-                dumpContent += `x = ${cols}, y = ${rows}, rule = B3/S23\n`; // 暂时只支持一个规则
+                dumpContent += `x = ${cols}, y = ${rows}, rule = ${ruleExp}\n`; // 暂时只支持一个规则
                 let len = 0;
                 for(let r = 0; r < rows; r++){
                     if(r > 0){
