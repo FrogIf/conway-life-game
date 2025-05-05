@@ -3,140 +3,71 @@
 	<head>
 		<meta charset="utf-8">
 		<title>Conway's Game of Life</title>
-        <script src="js/hashlife.js"></script>
-        <style>
-            .eye-button{
-                width: 15px;
-                height: 15px;
-                cursor: pointer;
-            }
-            .eye-button span{
-                width: 2px;
-                height: 2px;
-                position: absolute;
-            }
-            .eye-button span:nth-of-type(1){
-                right: 20%;
-                top: 20%;
-                background-color: #009E60;
-            }
-            .eye-button span:nth-of-type(2){
-                right: 50%;
-                top: 20%;
-                background-color: #FF5800;
-            }
-            .eye-button span:nth-of-type(3){
-                right: 80%;
-                top: 20%;
-                background-color: #FFD500;
-            }
-            .eye-button span:nth-of-type(4){
-                right: 20%;
-                top: 50%;
-                background-color: #C41E3A;
-            }
-            .eye-button span:nth-of-type(5){
-                right: 50%;
-                top: 50%;
-                background-color: #FFFFFF;
-            }
-            .eye-button span:nth-of-type(6){
-                right: 80%;
-                top: 50%;
-                background-color: #0051BA;
-            }
-            .eye-button span:nth-of-type(7){
-                right: 20%;
-                top: 80%;
-                background-color: #FFD500;
-            }
-            .eye-button span:nth-of-type(8){
-                right: 50%;
-                top: 80%;
-                background-color: #FF5800;
-            }
-            .eye-button span:nth-of-type(9){
-                right: 80%;
-                top: 80%;
-                background-color: #009E60;
-            }
-            .right-control-panel{
-                right: 10px;
-                top: 0px;
-                position: fixed;
-                width: 200px;
-                height: 575px;
-                border-radius: 5px;
-                background-color: rgba(191,191,191,0.4);
-                padding: 10px 10px;
-            }
-            .group-panel{
-                border: 1px solid gray; 
-                border-radius: 5px; 
-                padding: 5px; 
-                margin-top: 5px;
-            }
-        </style>
+        <script src="hashlife.js"></script>
+        <script src="conwaychart.js"></script>
+        <link rel="stylesheet" type="text/css" href="index.css"/>
 	</head>
 	<body>
-        <canvas id="gridCanvas" style="cursor: pointer;"></canvas>
+        <div id="conwaySpace" class="conway-space"></div>
         <div id="menuBtn" class="eye-button" style="position:fixed;right:0px;top:0px;">
             <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
         <div id="menuPanel" class="right-control-panel">
             <div class="group-panel">
-                <div style="align-items: center; display: grid; padding: 5px;">
-                    <button class="need-forbidden" onclick="test1()">test1</button>
-                    <button class="need-forbidden" onclick="test2()">test2</button>
+                <div>速度: <input id="speed" class="need-forbidden" value="100" type="number" style="width: 50px;margin-right: 15px;margin-left: 5px;"><span>ms/step</span></div>
+                <div style="align-items: center; display: grid; padding: 5px 0px; display: inline-block;">
+                    <label><input id="fastForward" type="checkbox" class="need-forbidden" />快进</label>
+                    <button id="runBtn" onclick="run()">运行</button>
+                    <div style="margin-left:5px;width:35px;display: inline-block;"><span id="stepCount">0</span></div>
+                    <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
                 </div>
             </div>
             <div class="group-panel">
-                <div><div style="width: 80px;display: inline-block;">边长:</div><input id="side" type="number" style="width: 80px;" value="100" ></div>
-                <div style="align-items: center; display: grid; padding: 5px;">
-                    <button class="need-forbidden" onclick="reDraw()">重绘</button>
+                <div style="align-items: center; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 5px;">
+                    <button onclick="fitZoom()">自适应</button>
+                    <button onclick="zoom(0.01)" >放大</button>
+                    <button onclick="zoom(-0.01)" >缩小</button>
                 </div>
+            </div>
+            <div class="group-panel">
                 <div class="group-panel">
                     <div>
                         <label><input id="doNothing" class="need-forbidden" type="radio" checked name="editMode" onchange="toggleEditMode()"/>无</label>
                         <label><input id="editPoint" class="need-forbidden" type="radio" name="editMode" onchange="toggleEditMode()"/>编辑点</label>
                         <label><input id="selectRegion" class="need-forbidden" type="radio" name="editMode" onchange="toggleEditMode()" />框选</label>
                     </div>
-                    <div style="margin-top: 5px;">
-                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, -1)">←</button>
-                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, 1)">→</button>
-                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(-1, 0)">↑</button>
-                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(1, 0)">↓</button>
+                    <div id="editBox" style="margin-top: 5px;">
+                        <span style="margin-right: 10px;">添加/删除:</span>
+                        <label id="editSwitchCon" class="switch" data-enabled="true"><input type="checkbox" id="editToggleSwitch" class="need-forbidden" checked><span class="slider round"></span></label>
+                    </div>
+                    <div id="selectBox" style="margin-top: 5px;">
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(-1, 0)">←</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(1, 0)">→</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, -1)">↑</button>
+                        <button class="need-forbidden select-control" style="width: 30px;" onclick="moveSelected(0, 1)">↓</button>
+                        <button class="need-forbidden select-control" style="width: 50px;" onclick="cancleSelect()">取消</button>
                     </div>
                     <div style="margin-top: 5px;">
-                        <button class="need-forbidden select-control" style="width: 80px;" onclick="clearSelected()">清除选择</button>
-                        <button class="need-forbidden select-control" style="width: 80px;" onclick="clearOthers()">清除其他</button>
+                        <button class="need-forbidden" style="width: 70px;" onclick="clearSelected()">清除选择</button>
+                        <button class="need-forbidden" style="width: 70px;" onclick="clearOthers()">清除其他</button>
+                        <button class="need-forbidden" style="width: 43px;" onclick="clearCanvas()">清空</button>
                     </div>
                 </div>
                 <div style="align-items: center; display: inline-block; padding: 5px;">
                     <label for="randomSeed">种子:</label>
-                    <input id="randomSeed" type="number" style="width: 30px;" min="0" max="10" value="5" >
+                    <input id="randomSeed" type="number" class="need-forbidden" style="width: 30px;" min="0" max="10" value="5" >
                     <button class="need-forbidden" style="width: 60px; margin-left: 10px;" onclick="randomPoint()">随机</button>
                 </div>
             </div>
             <div class="group-panel">
-                <div><button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button></div>
-                <div>速度: <input id="speed" class="need-forbidden" value="200" type="number" style="width: 50px;margin-right: 5px;margin-left: 5px;"><span>ms/step</span></div>
-                <div style="align-items: center; display: grid; padding: 5px; display: inline-block;">
-                    <label><input id="fastForward" type="checkbox" class="need-forbidden" />快进</label>
-                    <button id="runBtn" onclick="run()">运行</button>
-                    <span id="stepCount" style="margin-left: 10px;">0</span>
-                </div>
-            </div>
-            <div class="group-panel">
-                <div>
-                    <div style="align-items: center; display: grid; padding: 5px;"><button class="need-forbidden" onclick="dump()">下载</button></div>
-                </div>
-                <div class="group-panel">
-                    加载: <input class="need-forbidden" type="file" id="fileInput" accept=".cl">
+                <div style="align-items: center; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 5px;">
+                    <input class="need-forbidden" style="display: none;" type="file" id="fileInput" accept=".rle">
+                    <button class="need-forbidden" id="selectFile" onclick="document.getElementById('fileInput').click()" >导入</button>
+                    <button class="need-forbidden" onclick="dump()">导出</button>
                 </div>
                 <div>
                     示例: 
-                    <select id="demoSelect">
+                    <select id="demoSelect" class="need-forbidden">
                         <option value="0" selected>无</option>
                         <option value="1">稳定结构1</option>
                         <option value="2">稳定结构2</option>
@@ -151,399 +82,19 @@
             </div>
         </div>
         <script>
-            const hl = hashlife();
-            function test1(){
-                hl.traverse((x, y) => {
-                    console.log("x: " + x + ",y: " + y);
-                });
+            function disableSwitch(dom){
+                dom.setAttribute('data-enabled', 'false');
             }
-            function test2(){
-                hl.test();
+            function enableSwitch(dom){
+                dom.setAttribute('data-enabled', 'true');
             }
-            // 这里行用width指定
-            function makeConwaySpace(side){
-                var rowCount = side, colCount = side;
-                const cellSize = 10; // 每个网格单元的大小
-                const canvas = document.getElementById('gridCanvas');
-                const ctx = canvas.getContext('2d');
-                const aliveColor = 'black';
-                const emptyColor = 'white';
-                const selectedColor = '#ccffcc';
-                const bkColorArr = [ selectedColor ];
-
-                var conwaySpace = {};
-                var editable = false;
-                var selectDoing = false;
-
-                var selectedStartRow = -1;
-                var selectedEndRow = -1;
-                var selectedStartCol = -1;
-                var selectedEndCol = -1;
-
-                conwaySpace.getRange = () => {
-                    return {
-                        startRow: 0,
-                        endRow: rowCount - 1,
-                        startCol: 0,
-                        endCol: colCount - 1
-                    }
-                };
-
-                conwaySpace.getSelectedRange = () => {
-                    return {
-                        startRow: selectedStartRow,
-                        endRow: selectedEndRow,
-                        startCol: selectedStartCol,
-                        endCol: selectedEndCol
-                    };
+            document.getElementById('editToggleSwitch').addEventListener('change', function() {
+                if (this.checked) {
+                    console.log('开关打开');
+                } else {
+                    console.log('开关关闭');
                 }
-                
-                conwaySpace.enableEdit = () => { editable = true; }
-                conwaySpace.disableEdit = () => { editable = false; }
-                conwaySpace.enableSelect = () => { selectDoing = true; }
-                conwaySpace.disableSelect = () => { 
-                    selectDoing = false;
-                    selectedStartRow = -1;
-                    selectedEndRow = -1;
-                    selectedStartCol = -1;
-                    selectedEndCol = -1;
-                    for(let r = 0; r < conwaySpace.backgroupGrid.length; r++){
-                        let rows = conwaySpace.backgroupGrid[r];
-                        for(let c = 0; c < rows.length; c++){
-                            if(rows[c] == 1 && conwaySpace.checkStatus(r, c) == 0){
-                                conwaySpace.removePoint(r, c);
-                            }
-                        }
-                    }
-                }
-
-                function isInSelect(r, c){
-                    return r >= selectedStartRow && r <= selectedEndRow && c >= selectedStartCol && c <= selectedEndCol;
-                }
-                
-                function isSelectRangeExist(){
-                    return selectedStartRow >= 0 && selectedEndRow >= 0 && selectedStartCol >= 0 && selectedEndCol >= 0;
-                }
-
-                conwaySpace.draw = function(side){
-                    rowCount = side;
-                    colCount = side;
-                    // conwaySpace.gridMarks = Array.from({ length: rowCount }, () => 
-                    //     Array(colCount).fill(0)
-                    // );
-                    conwaySpace.backgroupGrid = Array.from({ length: rowCount }, () => 
-                        Array(colCount).fill(0)
-                    );
-                    selectedStartRow = -1;
-                    selectedEndRow = -1;
-                    selectedStartCol = -1;
-                    selectedEndCol = -1;
-                    
-                    canvas.width = colCount * cellSize;
-                    canvas.height = rowCount * cellSize;
-            
-                    // 设置线条样式
-                    ctx.strokeStyle = '#ccc'; // 灰色线条
-                    ctx.lineWidth = 1;
-                    ctx.imageSmoothingEnabled = false;
-            
-                    // 绘制垂直线
-                    for (let x = 0; x <= colCount; x += 1) {
-                        ctx.beginPath();
-                        ctx.moveTo(x * cellSize, 0);
-                        ctx.lineTo(x * cellSize, rowCount * cellSize);
-                        ctx.stroke();
-                    }
-                    // 绘制水平线
-                    for (let y = 0; y <= rowCount; y += 1) {
-                        ctx.beginPath();
-                        ctx.moveTo(0, y * cellSize);
-                        ctx.lineTo(colCount * cellSize, y * cellSize);
-                        ctx.stroke();
-                    }
-                }
-
-                conwaySpace.draw(rowCount, colCount);
-                
-                // 涂黑格子, 坐标从(0, 0)开始
-                conwaySpace.drawPoint = function(row, col){
-                    brushPointWithColor(row, col, aliveColor);
-                }
-
-                // 反转一个细胞的存活状态
-                conwaySpace.invertPointStatus = function(row, col){
-                    let m = hl.checkStatus(row, col);
-                    if(m == 1){
-                        hl.removePoint(row, col);
-                        conwaySpace.removePoint(row, col);
-                    }else{
-                        hl.addPoint(row, col);
-                        conwaySpace.drawPoint(row, col);
-                    }
-                }
-
-                function brushPointWithColor(row, col, color){
-                    if(row >= 0 && row < rowCount && col >= 0 && col < colCount){
-                        // 计算目标格子的左上角坐标
-                        const startX = col * cellSize + 1;
-                        const startY = row * cellSize + 1;
-                        // 绘制黑色矩形覆盖目标格子
-                        ctx.fillStyle = color; // 设置填充颜色为黑色
-                        ctx.fillRect(startX, startY, cellSize - 2, cellSize - 2); // 绘制矩形
-                    }
-                }
-
-                conwaySpace.removePoint = function(row, col){
-                    if(isInSelect(row, col)){
-                        brushPointWithColor(row, col, selectedColor);
-                    }else{
-                        brushPointWithColor(row, col, emptyColor);
-                    }
-                }
-
-                // 清空画布
-                conwaySpace.clear = function(){
-                    hl.clear();
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }
-
-                canvas.addEventListener('click', (event) => {
-                    if(!editable){
-                        return;
-                    }
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
-                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
-
-                    // 计算点击的行列号
-                    const clickedRow = Math.floor(mouseY / cellSize);
-                    const clickedCol = Math.floor(mouseX / cellSize);
-
-                    // 检查是否在有效范围内
-                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
-                        // 切换颜色逻辑
-                        let newMark = hl.invertStatus(clickedRow, clickedCol);
-                        if(newMark == 0){ // 刷白
-                            conwaySpace.removePoint(clickedRow, clickedCol);
-                        }else{
-                            conwaySpace.drawPoint(clickedRow, clickedCol);
-                            if(isInSelect(clickedRow, clickedCol)){
-                                brushPointWithColor(clickedRow, clickedCol, selectedColor);
-                            }
-                        }
-                    }
-                });
-
-                var startSelectRowNum = -1;
-                var startSelectColNum = -1;
-                canvas.addEventListener('mousedown', (event) => {
-                    startSelectRowNum = -1;
-                    endSelectColNum = -1;
-                    if(!selectDoing){
-                        return;
-                    }
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
-                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
-
-                    // 计算点击的行列号
-                    const clickedRow = Math.floor(mouseY / cellSize);
-                    const clickedCol = Math.floor(mouseX / cellSize);
-
-                    // 检查是否在有效范围内
-                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
-                        startSelectRowNum = clickedRow;
-                        startSelectColNum = clickedCol;
-                    }
-                });
-
-                canvas.addEventListener('mouseup', (event) => {
-                    if(!selectDoing || startSelectRowNum < 0 || startSelectColNum < 0){
-                        return;
-                    }
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = event.clientX - rect.left; // 获取鼠标点击的 X 坐标
-                    const mouseY = event.clientY - rect.top; // 获取鼠标点击的 Y 坐标
-
-                    // 计算点击的行列号
-                    const clickedRow = Math.floor(mouseY / cellSize);
-                    const clickedCol = Math.floor(mouseX / cellSize);
-
-                    if(clickedRow == startSelectRowNum && clickedCol == startSelectColNum){ return; }
-
-                    // 检查是否在有效范围内
-                    if (clickedRow >= 0 && clickedRow < rowCount && clickedCol >= 0 && clickedCol < colCount) {
-                        selectedStartRow = Math.min(clickedRow, startSelectRowNum);
-                        selectedEndRow = Math.max(clickedRow, startSelectRowNum);
-                        selectedStartCol = Math.min(clickedCol, startSelectColNum);
-                        selectedEndCol = Math.max(clickedCol, startSelectColNum);
-
-                        // 选中区域染色
-                        for(let r = 0; r < conwaySpace.backgroupGrid.length; r++){
-                            let rows = conwaySpace.backgroupGrid[r];
-                            for(let c = 0; c < rows.length; c++){
-                                let isAlivePoint = hl.checkStatus(r, c) == 1;
-                                if(isInSelect(r, c)){
-                                    conwaySpace.backgroupGrid[r][c] = 1;
-                                    if(!isAlivePoint) { brushPointWithColor(r, c, selectedColor); }
-                                }else{
-                                    conwaySpace.backgroupGrid[r][c] = 0;
-                                    if(!isAlivePoint) { conwaySpace.removePoint(r, c); }
-                                }
-                            }
-                        }
-                    }else{
-                        startSelectRowNum = -1;
-                        startSelectColNum = -1;
-                    }
-                });
-
-                conwaySpace.next = (fastForward) => {
-                    hl.nextGenerate(fastForward);
-                    for(let r = 0; r < rowCount; r++){
-                        for(let c = 0; c < colCount; c++){
-                            conwaySpace.removePoint(r, c);
-                        }
-                    }
-                    hl.traverse((x, y) => {
-                        conwaySpace.drawPoint(x, y);
-                    });
-                }
-
-                conwaySpace.dump = function(){
-                    let dumpContent = "";
-                    let start = true;
-                    hl.traverse((x, y) => {
-                        if(!start){
-                            dumpContent += (";" + x + "," + y);
-                        }else{
-                            start = false;
-                            dumpContent += (x + "," + y);
-                        }
-                    });
-                    return dumpContent;
-                }
-
-                // function refreshPoint(){
-                //     for(let r = 0; r < rowCount; r++){
-                //         for(let c = 0; c < colCount; c++){
-                //             if(conwaySpace.gridMarks[r][c] == 1){
-                //                 conwaySpace.drawPoint(r, c);
-                //             }else{
-                //                 let bv = conwaySpace.backgroupGrid[r][c];
-                //                 if(bv > 0){
-                //                     brushPointWithColor(r, c, bkColorArr[bv - 1]);
-                //                 }else{
-                //                     conwaySpace.removePoint(r, c);
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
-
-                conwaySpace.read = function(origin){
-                    let points = origin.split(';');
-                    conwaySpace.clear();
-                    for(let p of points){
-                        let coor = p.split(',');
-                        let x = Number(coor[0]);
-                        let y = Number(coor[1]);
-                        hl.addPoint(x, y);
-                    }
-
-                    let side = hl.getSideLength() / 2;
-                    let newColCount = side;
-                    let newRowCount = side;
-                    if(side < colCount){ newColCount = colCount; }
-                    if(side < rowCount){ newRowCount = rowCount; }
-                    conwaySpace.draw(newRowCount, newColCount);
-                    
-                    for(let p of points){
-                        let coor = p.split(',');
-                        let x = Number(coor[0]);
-                        let y = Number(coor[1]);
-                        conwaySpace.drawPoint(x, y);
-                    }
-                }
-
-                conwaySpace.moveSelected = (rowOffset, colOffset) => {
-                    // if((rowOffset == 0 && colOffset == 0) || !isSelectRangeExist()){ return; }
-                    
-                    // let newBackgroupGrid = Array.from({ length: rowCount }, () => 
-                    //     Array(colCount).fill(0)
-                    // );
-                    // let newGridMarks = Array.from({ length: rowCount }, () => 
-                    //     Array(colCount).fill(0)
-                    // );
-                    // for(let r = selectedStartRow; r <= selectedEndRow; r++){
-                    //     for(let c = selectedStartCol; c <= selectedEndCol; c++){
-                    //         let nr = r + rowOffset;
-                    //         let nc = c + colOffset;
-                    //         if(nr >= 0 && nr < rowCount && nc >= 0 && nc < colCount){
-                    //             newBackgroupGrid[nr][nc] = 1;
-                    //             newGridMarks[nr][nc] = conwaySpace.gridMarks[r][c];
-                    //         }
-                    //     }
-                    // }
-
-                    // for(let r = 0; r < rowCount; r++){
-                    //     for(let c = 0; c < colCount; c++){
-                    //         if(newBackgroupGrid[r][c] == 1){ // 选区中
-                    //             conwaySpace.backgroupGrid[r][c] = 1;
-                    //             conwaySpace.gridMarks[r][c] = newGridMarks[r][c];
-                    //         }else if(conwaySpace.backgroupGrid[r][c] == 1){
-                    //             conwaySpace.backgroupGrid[r][c] = 0;
-                    //             conwaySpace.gridMarks[r][c] = 0;
-                    //         }
-                    //     }
-                    // }
-                    // selectedStartRow += rowOffset;
-                    // selectedEndRow += rowOffset;
-                    // selectedStartCol += colOffset;
-                    // selectedEndCol += colOffset;
-                    // if((selectedStartCol < 0 && selectedEndCol < 0) 
-                    //     || (selectedStartRow < 0 && selectedEndRow < 0)
-                    //     || (selectedStartCol >= colCount && selectedEndCol >= colCount)
-                    //     || (selectedStartRow >= rowCount && selectedEndRow >= rowCount)
-                    // ){ // 整个选区超出范
-                    //     selectedStartRow = -1;
-                    //     selectedEndRow = -1;
-                    //     selectedStartCol = -1;
-                    //     selectedEndCol = -1;
-                    // }else{
-                    //     if(selectedStartRow < 0){ selectedStartRow = 0; }
-                    //     else if(selectedStartRow >= rowCount){ selectedStartRow = rowCount - 1; }
-                        
-                    //     if(selectedEndRow < 0){ selectedEndRow = 0; }
-                    //     else if(selectedEndRow >= rowCount){ selectedEndRow = rowCount - 1; }
-
-                    //     if(selectedStartCol < 0){ selectedStartCol = 0; }
-                    //     else if(selectedStartCol >= colCount){ selectedStartCol = colCount - 1; }
-                        
-                    //     if(selectedEndCol < 0){ selectedEndCol = 0; }
-                    //     else if(selectedEndCol >= colCount){ selectedEndCol = colCount - 1; }
-                    // }
-
-                    // refreshPoint();
-                };
-
-                var scale = 1;
-                conwaySpace.scale = (s) => {
-                    if(scale > 0){
-                        scale = s * scale;
-                    }else{
-                        scale = s / scale;
-                    }
-                    ctx.scale(scale, scale);
-                };
-
-                conwaySpace.getScale = () => {
-                    return scale;
-                };
-
-                return conwaySpace;
-            }
-
+            });
             document.getElementById("menuBtn").onclick = (e) => {
                 let panel = document.getElementById("menuPanel");
                 if(panel.style.display == "none"){
@@ -553,35 +104,115 @@
                 }
             }
 
-            const conwaySpace = makeConwaySpace(Number(document.getElementById('side').value));
-            
-            function reDraw(){
-                conwaySpace.clear();
-                conwaySpace.draw(Number(document.getElementById('side').value));
+            const hl = hashlife();
+            const conwaySpace = new ConwayChart(document.getElementById('conwaySpace'), function(ff){
+                hl.traverse((x, y) => {
+                    ff(x, y);
+                });
+            }, function(x, y){
+                if(document.getElementById('editToggleSwitch').checked){
+                    let m = hl.checkStatus(x, y);
+                    if(m == 1){
+                        hl.removePoint(x, y);
+                    }
+                }else{
+                    let m = hl.checkStatus(x, y);
+                    if(m != 1){
+                        hl.addPoint(x, y);
+                    }
+                }
+                invertPointStatus(x, y);
+            });
+
+            function clearCanvas(){
+                clearAll();
+                conwaySpace.fitCanvas();
             }
+
+            function clearAll(){
+                hl.clear();
+                conwaySpace.cancelSelectRange();
+                conwaySpace.render();
+            }
+
+            function invertPointStatus(x, y){
+                let m = hl.checkStatus(x, y);
+                if(m == 1){
+                    hl.removePoint(x, y);
+                }else{
+                    hl.addPoint(x, y);
+                }
+            }
+
+            function getRandomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function randomPoint(){
+                let selectRange = conwaySpace.getSelectedRange();
+                if(!selectRange){
+                    alert("请选择区域");
+                    return;
+                }
+
+                let min = Number(document.getElementById("randomSeed").min);
+                let max = Number(document.getElementById("randomSeed").max);
+                let seed = Number(document.getElementById("randomSeed").value);
+                if(seed > max){ 
+                    document.getElementById("randomSeed").value = max;
+                    seed = max;
+                }else if(seed < min){
+                    document.getElementById("randomSeed").value = min;
+                    seed = min;
+                }
+
+                for(let r = selectRange.ay; r <= selectRange.by; r++){
+                    for(let c = selectRange.ax; c <= selectRange.bx; c++){
+                        if(getRandomInt(min, max) <= seed){
+                            invertPointStatus(c, r);
+                        }
+                    }
+                }
+                conwaySpace.render();
+            }
+
 
             function toggleEditMode(){
                 toggleEditable();
                 toggleSelectable();
             }
 
+            function enableEdit(){
+                conwaySpace.enableEdit();
+                enableSwitch(document.getElementById('editSwitchCon'));
+            }
+
+            function disableEdit(){
+                conwaySpace.disableEdit();
+                disableSwitch(document.getElementById('editSwitchCon'));
+            }
+
             function toggleEditable(){
                 if(document.getElementById('editPoint').checked && !document.getElementById('editPoint').disabled){
-                    conwaySpace.enableEdit();
+                    enableEdit();
+                    document.getElementById('editBox').style.display = 'block';
                 }else{
-                    conwaySpace.disableEdit();
+                    disableEdit();
+                    document.getElementById('editBox').style.display = 'none';
                 }
             }
 
             function toggleSelectable(){
                 if(document.getElementById('selectRegion').checked && !document.getElementById('selectRegion').disabled){
                     conwaySpace.enableSelect();
+                    document.getElementById('selectBox').style.display = 'block';
                     let controls = document.getElementsByClassName('select-control');
                     for(let c of controls){
                         c.disabled = false;
                     }
                 }else{
                     conwaySpace.disableSelect();
+                    document.getElementById('selectBox').style.display = 'none';
                     let controls = document.getElementsByClassName('select-control');
                     for(let c of controls){
                         c.disabled = true;
@@ -589,8 +220,85 @@
                 }
             }
 
+            function clearSelected(){
+                let selectedRange = conwaySpace.getSelectedRange();
+                if(selectedRange){
+                    for(let c = selectedRange.ax; c <= selectedRange.bx; c++){
+                        for(let r = selectedRange.ay; r <= selectedRange.by; r++){
+                            hl.removePoint(c, r);
+                        }
+                    }
+                    conwaySpace.render();
+                }
+            }
+
+            function clearOthers(){
+                let selectedRange = conwaySpace.getSelectedRange();
+                if(selectedRange){
+                    let removePoints = [];
+                    hl.traverse((x, y) => {
+                        if(x < selectedRange.ax || x > selectedRange.bx || y < selectedRange.ay || y > selectedRange.by){
+                            removePoints.push([x, y]);
+                        }
+                    });
+                    if(removePoints.length > 0){
+                        removePoints.forEach(p => {
+                            hl.removePoint(p[0], p[1]);
+                        })
+                        conwaySpace.render();
+                    }
+                }
+            }
+
+            function cancleSelect(){
+                conwaySpace.cancelSelectRange();
+            }
+
+            function moveSelected(xOffset, yOffset){
+                let selectedRange = conwaySpace.getSelectedRange();
+                if(selectedRange){
+                    let newRange = {
+                        ax: selectedRange.ax + xOffset,
+                        ay: selectedRange.ay + yOffset,
+                        bx: selectedRange.bx + xOffset,
+                        by: selectedRange.by + yOffset
+                    };
+                    let removePoints = [];
+                    let addPoints = [];
+                    hl.traverse((x, y) => {
+                        // 把老区域全部清空
+                        if(x >= selectedRange.ax && x <= selectedRange.bx && y >= selectedRange.ay && y <= selectedRange.by){
+                            removePoints.push([x, y]);
+
+                            // 将点移动到新的位置
+                            addPoints.push([x + xOffset, y + yOffset]);
+                        }
+                        // 把新区域全部清空
+                        if(x >= newRange.ax && x <= newRange.bx && y >= newRange.ay && y <= newRange.by){
+                            removePoints.push([x, y]);
+                        }
+                    });
+                    if(removePoints.length > 0){
+                        removePoints.forEach(p => {
+                            hl.removePoint(p[0], p[1]);
+                        });
+                    }
+                    if(addPoints.length > 0){
+                        addPoints.forEach(p => {
+                            hl.addPoint(p[0], p[1]);
+                        });
+                    }
+                    conwaySpace.moveSelectedRange(xOffset, yOffset);
+                }
+            }
+
             function next(){
-                conwaySpace.next(false);
+                nextStep(document.getElementById('fastForward').checked);
+            }
+
+            function nextStep(fastForward){
+                hl.nextGenerate(fastForward);
+                conwaySpace.render();
             }
 
             var running = false;
@@ -607,8 +315,13 @@
                         c.disabled = false;
                     }
 
-                    toggleEditMode();
                     document.getElementById('runBtn').innerText = '运行';
+                    if(document.getElementById('selectRegion').checked && !document.getElementById('selectRegion').disabled){
+                        conwaySpace.enableSelect();
+                    }
+                    if(document.getElementById('editPoint').checked && !document.getElementById('editPoint').disabled){
+                        enableEdit();
+                    }
                 }else{
                     let p = document.getElementById('speed').value;
                     if(p < 100){ 
@@ -621,8 +334,10 @@
                     for(let c of controls){
                         c.disabled = true;
                     }
-                    toggleEditMode();
+
                     document.getElementById('runBtn').innerText = '停止';
+                    conwaySpace.disableSelect();
+                    disableEdit();
 
                     var fastForward = document.getElementById('fastForward').checked;
 
@@ -630,31 +345,12 @@
                     let cc = 0;
                     intervalId = setInterval(() => {
                         document.getElementById("stepCount").innerText = ++cc;
-                        conwaySpace.next(fastForward);
+                        nextStep(fastForward);
                     }, p);
                 }
             }
 
-            function dump(){
-                // 文件内容
-                let fileContent = conwaySpace.dump();
-
-                // 创建 Blob 对象
-                let blob = new Blob([fileContent], { type: "text/plain" });
-
-                // 生成文件 URL
-                let url = URL.createObjectURL(blob);
-
-                // 创建 <a> 标签并触发下载
-                let a = document.createElement("a");
-                a.href = url;
-                a.download = "dump.cl"; // 设置文件名
-                a.click();
-
-                // 释放 URL 对象
-                URL.revokeObjectURL(url);
-            }
-
+            // 导入rle
             document.getElementById('fileInput').addEventListener('change', (event) => {
                 const file = event.target.files[0]; // 获取用户选择的文件
 
@@ -664,7 +360,8 @@
                     // 当文件读取完成时触发
                     reader.onload = function (e) {
                         const content = e.target.result; // 文件内容
-                        conwaySpace.read(content);
+                        readRle(content);
+                        document.getElementById('fileInput').value = '';
                     };
 
                     // 如果需要处理错误
@@ -677,110 +374,201 @@
                 }
             });
 
+            // Run Length Encoded
+            function readRle(rleContent){
+                clearAll();
+                let lines = rleContent.split('\n');
+                let i = 0;
+
+                // 跳过注释
+                for(; i < lines.length; i++){
+                    let line = lines[i];
+                    line = line.trim();
+                    if(!line.startsWith('#')){
+                        break;
+                    }
+                }
+
+                // 读取header
+                let header = lines[i];
+                header = header.trim().replace(/\s/g, "");
+                let hArr = header.split(',');
+                let col = 0;
+                let row = 0;
+                for(let j = 0; j < hArr.length; j++){
+                    let h = hArr[j];
+                    if(h.startsWith('x=')){
+                        col = parseInt(h.substring(2, h.length));
+                    }else if(h.startsWith('y=')){
+                        row = parseInt(h.substring(2, h.length));
+                    }else if(h.startsWith('rule=')){
+                        // 规则, 忽略
+                    }
+                }
+                i++;
+
+                // 读取数据
+                let x = 0;
+                let y = 0;
+                let num = 1;
+                for(; i < lines.length; i++){
+                    let data = lines[i];
+                    if(data.startsWith('#')){ continue; }
+                    for(let c = 0, len = data.length; c < len; c++){
+                        let ch = data[c];
+                        if(ch == '\n' || ch == '\r'){ continue; }
+                        if(ch >= '0' && ch <= '9'){
+                            let numBuilder = '';
+                            for(; c < len; c++){
+                                ch = data[c];
+                                if(ch < '0' || ch > '9'){
+                                    break;
+                                }
+                                numBuilder += ch;
+                            }
+                            num = parseInt(numBuilder);
+                        }
+
+                        if(ch == '$'){ // 新的一行
+                            y += num;
+                            x = 0;
+                            num=1;
+                        }else if(ch == 'b'){ // 死亡细胞
+                            x += num;
+                            num=1;
+                        }else if(ch == 'o'){ // 活细胞数量
+                            for(let k = 0; k < num; k++, x++){
+                                hl.addPoint(x, y);
+                            }
+                            num=1;
+                        }else if(ch == '!'){
+                            break;
+                        }else{
+                            console.warn("unrecognized char : " + ch);
+                        }
+                    }
+                }
+
+                conwaySpace.render();  // 需要调用一下这个方法, 否则可能不知道当前图像大小, 无法进行自适应
+                conwaySpace.fitCanvas();
+            }
+
+            // 导出rle
+            function dump(){
+                // 文件内容
+                let dumpContent = "";
+                let start = true;
+
+                let minX = null, maxX = null, minY = null, maxY = null;
+
+                // 确定图像的边界范围
+                hl.traverse((x, y) => {
+                    if(minX == null){ minX = x; }
+                    else{ minX = Math.min(minX, x); }
+                    if(minY == null){ minY = y; }
+                    else{ minY = Math.min(minY, y); }
+                    if(maxX == null){ maxX = x; }
+                    else{ maxX = Math.max(maxX, x); }
+                    if(maxY == null){ maxY = y; }
+                    else{ maxY = Math.max(maxY, y); }
+                });
+
+                // 初始化二维数组
+                let arr = new Array();
+                let rows = maxY - minY + 1;
+                let cols = maxX - minX + 1;
+                for(let i = 0; i < rows; i++){
+                    arr.push(new Array(cols).fill(0));
+                }
+
+                // 标记二维数组存活元素
+                hl.traverse((x, y) => {
+                    arr[y - minY][x - minX] = 1;
+                });
+
+
+                // 生成rle
+                dumpContent = "#C generate by conway-life-game\n";
+                dumpContent += `x = ${cols}, y = ${rows}, rule = B3/S23\n`; // 暂时只支持一个规则
+                let len = 0;
+                for(let r = 0; r < rows; r++){
+                    if(r > 0){
+                        dumpContent += '$'; 
+                    }
+                    let row = arr[r];
+                    let s = 0;
+                    let c = 0;
+                    let target = row[c];
+                    for(; c < cols + 1; c++){
+                        if(target != row[c]){
+                            if(row[c] == undefined && target == 0){ break; } // 忽略末尾空元素
+                            let cc = c - s;
+                            let exp = `${cc == 1 ? '' : cc}${target == 1 ? 'o' : 'b'}`;
+                            dumpContent += exp;
+                            len += exp.length;
+                            if(len >= 70){
+                                dumpContent += '\n';
+                                len = 0;
+                            }
+                            target = row[c];
+                            s = c;
+                        }
+                    }
+                }
+                dumpContent += '!';
+
+
+                // 创建 Blob 对象
+                let blob = new Blob([dumpContent], { type: "text/plain" });
+
+                // 生成文件 URL
+                let url = URL.createObjectURL(blob);
+
+                // 创建 <a> 标签并触发下载
+                let a = document.createElement("a");
+                a.href = url;
+                a.download = "dump.rle"; // 设置文件名
+                a.click();
+
+                // 释放 URL 对象
+                URL.revokeObjectURL(url);
+            }
 
             let demoArr = [
                 // 稳定1-方块
-                "3,4;2,4;3,3;2,3",
+                "x=2,y=2,rule=B3/S23\n2o$2o!",
                 // 稳定2-池塘
-                "4,6;5,5;5,4;3,6;2,5;2,4;4,3;3,3",
+                "x=2,y=2,rule=B3/S23\nb2o$o2bo$o2bo$b2o!",
                 // 震荡1
-                "4,2;3,2;2,2",
+                "x=2,y=2,rule=B3/S23\no$o$o!",
                 // 震荡2
-                "10,12;9,12;8,12;10,11;9,11;8,11;10,9;10,8;9,9;9,8;7,12;6,12;5,12;3,12;2,12;7,11;6,11;5,11;3,11;2,11;3,10;2,10;3,9;2,9;3,8;2,8;10,7;10,6;9,7;9,6;10,5;10,4;9,5;9,4;7,5;6,5;7,4;6,4;5,5;4,5;5,4;4,4;3,7;2,7;3,5;2,5;3,4;2,4",
+                "x=2,y=2,rule=B3/S23\n2ob6o$2ob6o$2o$2o5b2o$2o5b2o$2o5b2o$7b2o$6ob2o$6ob2o!",
                 // 滑翔机1
-                "2,2;1,2;0,2;2,1;1,0",
+                "x=2,y=2,rule=B3/S23\n2bo$obo$b2o!",
                 // 滑翔机2
-                "4,5;5,4;3,5;2,5;2,4;5,1;2,3;2,2;3,1",
+                "x=2,y=2,rule=B3/S23\nb4o$o3bo$4bo$o2bo!",
                 // 高斯帕机枪
-                "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+                "x=2,y=2,rule=B3/S23\n24bo$22bobo$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o$2o8bo3bob2o4bobo$10bo5bo7bo$11bo3bo$12b2o!"
             ];
             function drawDemo(){
                 let index = Number(document.getElementById("demoSelect").value) - 1;
                 if(index >= 0){
-                    conwaySpace.read(demoArr[index]);
+                    readRle(demoArr[index]);
                 }
             }
-
-            function moveSelected(rowOffset, colOffsset){
-                conwaySpace.moveSelected(rowOffset, colOffsset);
-            }
-
-            function getRandomInt(min, max) {
-                return Math.floor(Math.random() * (max - min + 1)) + min;
-            }
-
-            function randomPoint(){
-                let selectedRange = conwaySpace.getSelectedRange();
-                let randomRange;
-                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
-                    randomRange = selectedRange;
-                }else{
-                    randomRange = conwaySpace.getRange();
-                }
-
-                let min = Number(document.getElementById("randomSeed").min);
-                let max = Number(document.getElementById("randomSeed").max);
-                let seed = Number(document.getElementById("randomSeed").value);
-                if(seed > max){ 
-                    document.getElementById("randomSeed").value = max;
-                    seed = max;
-                }else if(seed < min){
-                    document.getElementById("randomSeed").value = min;
-                    seed = min;
-                }
-                for(let r = randomRange.startRow; r <= randomRange.endRow; r++){
-                    for(let c = randomRange.startCol; c <= randomRange.endCol; c++){
-                        if(getRandomInt(min, max) <= seed){
-                            conwaySpace.invertPointStatus(r, c);
-                        }
-                    }
-                }
-            }
-
-            function clearSelected(){
-                let selectedRange = conwaySpace.getSelectedRange();
-                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
-                    for(let r = selectedRange.startRow; r <= selectedRange.endRow; r++){
-                        for(let c = selectedRange.startCol; c <= selectedRange.endCol; c++){
-                            conwaySpace.removePoint(r, c);
-                        }
-                    }
-                }
-            }
-
-            function clearOthers(){
-                let selectedRange = conwaySpace.getSelectedRange();
-                if(selectedRange.startRow >= 0 && selectedRange.endCol >= 0 && selectedRange.startCol >= 0 && selectedRange.endRow >= 0){
-                    let totalRange = conwaySpace.getRange();
-                    for(let r = totalRange.startRow; r <= totalRange.endRow; r++){
-                        for(let c = totalRange.startCol; c <= totalRange.endCol; c++){
-                            if(r < selectedRange.startRow || r > selectedRange.endRow || c < selectedRange.startCol || c > selectedRange.endCol){
-                                conwaySpace.removePoint(r, c);
-                            }
-                        }
-                    } 
-                }
-            }
-
-            // 画布缩放
-            document.getElementById("gridCanvas").addEventListener('wheel', function(event){
-                event.preventDefault();
-                let dy = event.deltaY;
-                console.log(dy);
-                if(dy != 0){
-                    let scale = conwaySpace.getScale();
-                    if(dy < 0){
-                        scale = 1.05;
-                    }else{
-                        scale = -1.05;
-                    }
-                    if(scale < 3 && scale > 0.1){
-                        conwaySpace.scale(scale);
-                    }
-                }
-            });
 
             toggleEditMode();
+
+            // 画面自适应
+            function fitZoom(){
+                conwaySpace.render();  // 需要调用一下这个方法, 否则可能不知道当前图像大小, 无法进行自适应
+                conwaySpace.fitCanvas();
+            }
+
+            // 缩放
+            function zoom(scale /*缩放增量*/){
+                conwaySpace.zoom(scale);
+            }
         </script>
 	</body>
 </html>

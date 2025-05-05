@@ -183,13 +183,17 @@ function hashlife(){
 
     function evolve(node, fastForward){ // 返回的是下一代的中心区域结果
         let result = fastForward ? node.ffEvolveResult : node.evolveResult;
-        if(result){ return result; }
+        if(result){
+            return result;
+        }
+
 
         if(node.depth == 2){  // 4 x 4
             let p0c = node.ne.nw._id + node.ne.ne._id + node.ne.se._id + node.se.ne._id + node.se.nw._id + node.sw.ne._id + node.nw.se._id + node.nw.ne._id;
             let p1c = node.nw.nw._id + node.nw.ne._id + node.nw.sw._id + node.ne.nw._id + node.ne.sw._id + node.sw.nw._id + node.sw.ne._id + node.se.nw._id;
             let p2c = node.ne.sw._id + node.ne.se._id + node.nw.se._id + node.sw.ne._id + node.sw.se._id + node.se.sw._id + node.se.se._id + node.se.ne._id;
             let p3c = node.nw.se._id + node.nw.sw._id + node.ne.sw._id + node.se.nw._id + node.se.sw._id + node.sw.nw._id + node.sw.sw._id + node.sw.se._id;
+            // 节点存活计算
             result = addToCache({
                 depth: 1,
                 ne: (node.ne.sw._id == 1 ? ((p0c == 2 || p0c == 3) ? c1 : c0) : (p0c == 3 ? c1 : c0)),
@@ -207,16 +211,17 @@ function hashlife(){
              */
             let node1, node2, node3, node4, node5, node6, node7, node8, node9;
             let cDepth = node.depth - 1;
-            if(fastForward){ // 快进
-                node1 = evolve(node.nw);
-                node2 = evolve(addToCache({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }));
-                node3 = evolve(node.ne);
-                node4 = evolve(addToCache({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }));
-                node5 = evolve(addToCache({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }));
-                node6 = evolve(addToCache({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }));
-                node7 = evolve(node.sw);
-                node8 = evolve(addToCache({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }));
-                node9 = evolve(node.se);
+            let ff = fastForward && node.depth < 8; // 层级太高时, 不进行跳代, 防止程序卡顿
+            if(ff){ // 快进
+                node1 = evolve(node.nw, fastForward);
+                node2 = evolve(addToCache({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }), fastForward);
+                node3 = evolve(node.ne, fastForward);
+                node4 = evolve(addToCache({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }), fastForward);
+                node5 = evolve(addToCache({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }), fastForward);
+                node6 = evolve(addToCache({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }), fastForward);
+                node7 = evolve(node.sw, fastForward);
+                node8 = evolve(addToCache({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }), fastForward);
+                node9 = evolve(node.se, fastForward);
             }else{
                 let dd = node.depth - 2;
                 node1 = addToCache({depth: dd, ne : node.nw.ne.sw, nw : node.nw.nw.se, sw : node.nw.sw.ne, se : node.nw.se.nw });
@@ -231,10 +236,10 @@ function hashlife(){
             }
             result = addToCache({
                 depth: cDepth,
-                ne: evolve(addToCache({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6})),
-                nw: evolve(addToCache({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5})),
-                sw: evolve(addToCache({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8})),
-                se: evolve(addToCache({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}))
+                ne: evolve(addToCache({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6}), fastForward),
+                nw: evolve(addToCache({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5}), fastForward),
+                sw: evolve(addToCache({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8}), fastForward),
+                se: evolve(addToCache({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}), fastForward)
             });
         }
         if(fastForward){
@@ -396,9 +401,12 @@ function hashlife(){
         // 1. 区域扩展, 生命游戏中的光速是, 1步一格
         // 2. 获取存活最大值
         if(fastForward){
-
+            let skipGen = 1 << (root.depth - 2); // 计算跳跃的代数
+            if(root.l <= skipGen || root.r <= skipGen || root.t <= skipGen || root.b <= skipGen){
+                root = extendNode(root);
+            }
         }else{
-            if(root.l == 0 || root.r == 0 || root.t == 0 || root.b == 4){
+            if(root.l == 0 || root.r == 0 || root.t == 0 || root.b == 0){
                 root = extendNode(root);
             }
         }
@@ -420,7 +428,7 @@ function hashlife(){
     }
 
     /**
-     * 检查指定位置是存活还是死亡状态
+     * 检查指定位置是存活还是死亡状态, 1 - 存活, 0 - 死亡
      */
     hl.checkStatus = function(x, y){
         return getPointStatus(root, x, y);
@@ -428,12 +436,6 @@ function hashlife(){
 
     hl.getSideLength = function(){
         return calculateSideLength(root.depth);
-    }
-
-    hl.test = function(){
-        root = extendNode(root);
-        console.log(root);
-        // console.log(nodeCache);
     }
 
     return hl;
