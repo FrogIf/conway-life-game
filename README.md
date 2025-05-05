@@ -8,10 +8,6 @@
 
 > 紧邻的斜对角也是邻居, 即每个点有8个邻居
 
-## Plan
-
-* 多规则支持
-
 ## Reference
 
 * [An Algorithm for Compressing Space and Time](https://www.drdobbs.com/jvm/an-algorithm-for-compressing-space-and-t/184406478)
