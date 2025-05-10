@@ -217,43 +217,37 @@ class ConwayChart {
 
   // 绘制网格
   drawGrid(){
-    if(this.scale < 0.6){ // 如果缩放过小, 就不画网格了
+    if(this.scale < 0.5){ // 如果缩放过小, 就不画网格了
       return;
     }
 
     var ctx = ctx || this.ctx;
-    ctx.strokeStyle = this.style.gridLineColor; // 灰色线条
+    ctx.strokeStyle = this.style.gridLineColor; // 线条颜色
     ctx.lineWidth = 1;
     ctx.imageSmoothingEnabled = false;
-
-    let hh = this.height / this.scale;
-    let ww = this.width / this.scale;
-    let xOffset = this.offsetX / this.scale;
-    let yOffset = this.offsetY / this.scale;
-
-    let colCount = Math.ceil(ww / this.blockWidth);
-    let rowCount = Math.ceil(hh / this.blockWidth);
     
-    let cOffset = Math.floor(xOffset / this.blockWidth);
-    let rOffset = Math.floor(yOffset / this.blockWidth);
-    colCount -= cOffset;
-    rowCount -= rOffset;
+    let blockWidth = this.blockWidth * this.scale;
+    let offsetX = this.offsetX - blockWidth * Math.floor(this.offsetX / blockWidth);
+    let offsetY = this.offsetY - blockWidth * Math.floor(this.offsetY / blockWidth);
+
+    let colCount = Math.ceil(this.width / blockWidth);
+    let rowCount = Math.ceil(this.height / blockWidth);
     
     // 绘制垂直线
-    for (let c = 0 - cOffset; c <= colCount; c += 1) {
+    for (let c = 0; c <= colCount; c++) {
       ctx.beginPath();
-      let xx = c * this.blockWidth;
-      ctx.moveTo(xx, 0 - yOffset);
-      ctx.lineTo(xx, hh - yOffset);
+      let xx = c * blockWidth + offsetX;
+      ctx.moveTo(xx, 0);
+      ctx.lineTo(xx, this.height);
       ctx.stroke();
     }
   
     // 绘制水平线
-    for (let r = 0 - rOffset; r <= rowCount; r += 1) {
+    for (let r = 0; r <= rowCount; r++) {
         ctx.beginPath();
-        let yy = r * this.blockWidth;
-        ctx.moveTo(0 - xOffset, yy);
-        ctx.lineTo(ww - xOffset, yy);
+        let yy = r * blockWidth + offsetY;
+        ctx.moveTo(0, yy);
+        ctx.lineTo(this.width, yy);
         ctx.stroke();
     }
   }
@@ -262,7 +256,6 @@ class ConwayChart {
   render() {
     this.El.width = this.width;
     
-    this.ctx.setTransform(this.scale,0, 0, this.scale, this.offsetX, this.offsetY);
     let range = this.getViewRange();
     this.drawSelectRange();
 
@@ -270,33 +263,49 @@ class ConwayChart {
       if(x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY ){
         this.drawBlock(x, y);
       }
-    })
+    });
     this.drawGrid();
   }
 
   drawSelectRange(){
-    let xEdge = Math.abs(this.selectRange.ax - this.selectRange.bx);
-    let yEdge = Math.abs(this.selectRange.ay - this.selectRange.by);
+    let selectRange = this.getSelectedRange();
+    if(!selectRange){ return; }
+    let xEdge = selectRange.bx - selectRange.ax;
+    let yEdge = selectRange.by - selectRange.ay;
     if(xEdge == 0 || yEdge == 0){
       return;
     }
-    let x = Math.min(this.selectRange.ax, this.selectRange.bx);
-    let y = Math.min(this.selectRange.ay, this.selectRange.by);
+
+    let range = this.getViewRange();
+    let startX = Math.max(selectRange.ax, range.minX);
+    let startY = Math.max(selectRange.ay, range.minY);
+    let endX = Math.min(selectRange.bx, range.maxX);
+    let endY = Math.min(selectRange.by, range.maxY);
+    xEdge = endX - startX;
+    yEdge = endY - startY;
+    if(endY - startY <= 0 || endX - startX <= 0){
+      return;
+    }
+
+    let blockWidth = this.blockWidth * this.scale;
+
     this.ctx.beginPath();
     this.ctx.fillStyle = this.style.selectColor;
-    this.ctx.fillRect(x * this.blockWidth, y * this.blockWidth, (xEdge + 1) * this.blockWidth, (yEdge + 1) * this.blockWidth);
+    this.ctx.fillRect(startX * blockWidth + this.offsetX, startY * blockWidth + this.offsetY, (xEdge + 1) * blockWidth, (yEdge + 1) * blockWidth);
   }
 
   // 绘制块方法 
   drawBlock(xi, yi) {
-    let x = xi * this.blockWidth;
-    let y = yi * this.blockWidth;
+    let blockWidth = this.blockWidth * this.scale;
+
+    let x = xi * blockWidth + this.offsetX;
+    let y = yi * blockWidth + this.offsetY;
     this.ctx.beginPath();
     this.ctx.fillStyle = this.style.pointColor;
 
     let enhance = this.calculateEnhance();
 
-    this.ctx.fillRect(x, y, this.blockWidth * enhance, this.blockWidth * enhance);
+    this.ctx.fillRect(x, y, blockWidth * enhance, blockWidth * enhance);
   }
 
   calculateEnhance(){
