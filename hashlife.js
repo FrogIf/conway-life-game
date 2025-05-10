@@ -7,17 +7,39 @@ function hashlife(){
     const nodeCache = new Array(); // 二维数组, 第一个维度表示深度, 第二个维度存储节点Map
     const emptyNodes = new Array(); // 没有存活节点的区域, index = depth
 
-    function getKey(node){
-        return node.ne._id +"_" + node.nw._id + "_" + node.se._id + "_" + node.sw._id;
-    }
-
     function searchNodeFromCache(node){
         if(node.depth - 1 < nodeCache.length){
             let nodeMap = nodeCache[node.depth - 1];
-            return nodeMap.get(getKey(node));
+            let cc = nodeMap.get(node.ne._id);
+            if(!cc){ return null; }
+            cc = cc.get(node.nw._id);
+            if(!cc){ return null; }
+            cc = cc.get(node.se._id);
+            if(!cc){ return null; }
+            return cc.get(node.sw._id);
         }else{
             return null;
         }
+    }
+
+    function setNodeToCache(node){
+        while(node.depth - 1 >= nodeCache.length){
+            nodeCache.push(new Map());
+        }
+
+        let nodeMap = nodeCache[node.depth - 1];
+        node._id = idGenerate();
+
+        let up = nodeMap;
+        let cc = nodeMap.get(node.ne._id);
+        if(!cc){ cc = new Map(); up.set(node.ne._id, cc); }
+        up = cc;
+        cc = cc.get(node.nw._id);
+        if(!cc){ cc = new Map(); up.set(node.nw._id, cc); }
+        up = cc;
+        cc = cc.get(node.se._id);
+        if(!cc){ cc = new Map(); up.set(node.se._id, cc); }
+        cc.set(node.sw._id, node);
     }
 
     /*
@@ -68,16 +90,9 @@ function hashlife(){
     function addToCache(node){
         let cacheNode = searchNodeFromCache(node);
         if(cacheNode){ return cacheNode; }
-
-        let k = getKey(node);
-        while(node.depth - 1 >= nodeCache.length){
-            nodeCache.push(new Map());
-        }
-
-        let nodeMap = nodeCache[node.depth - 1];
-        node._id = idGenerate();
+        
+        setNodeToCache(node);
         calculateNodeLiveEdge(node);
-        nodeMap.set(k, node);
         return node;
     }
 
@@ -184,10 +199,9 @@ function hashlife(){
     function evolve(node, fastForward, rule){ // 返回的是下一代的中心区域结果
         let result = fastForward ? node.ffEvolveResult : node.evolveResult;
         if(result){
-            let res = result[rule.key];
-            return res;
+            let res = result.get(rule.key);
+            if(res){ return res; }
         }
-
 
         if(node.depth == 2){  // 4 x 4
             let p0c = node.ne.nw._id + node.ne.ne._id + node.ne.se._id + node.se.ne._id + node.se.nw._id + node.sw.ne._id + node.nw.se._id + node.nw.ne._id;
@@ -246,10 +260,10 @@ function hashlife(){
         }
         if(fastForward){
             if(!node.ffEvolveResult) { node.ffEvolveResult = new Map(); }
-            node.ffEvolveResult[rule.key] = result;
+            node.ffEvolveResult.set(rule.key, result);
         }else{
             if(!node.evolveResult) { node.evolveResult = new Map(); }
-            node.evolveResult[rule.key] = result;
+            node.evolveResult.set(rule.key, result);
         }
         return result;
     }

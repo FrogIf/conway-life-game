@@ -31,8 +31,8 @@
             <div class="group-panel">
                 <div style="align-items: center; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 5px;">
                     <button onclick="fitZoom()">自适应</button>
-                    <button onclick="zoom(0.01)" >放大</button>
-                    <button onclick="zoom(-0.01)" >缩小</button>
+                    <button onclick="zoom(1)" >放大</button>
+                    <button onclick="zoom(-1)" >缩小</button>
                 </div>
             </div>
             <div class="group-panel">
@@ -66,10 +66,19 @@
                 </div>
             </div>
             <div class="group-panel">
+                <div style="align-items: center; display: inline-block; padding: 5px;">
+                    <label for="randomSeed">夜间模式:</label>
+                    <label class="switch" data-enabled="true"><input type="checkbox" id="styleToggleSwitch" class="need-forbidden" ><span class="slider round"></span></label>
+                </div>
+            </div>
+            <div class="group-panel">
                 <div style="align-items: center; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 5px;">
                     <input class="need-forbidden" style="display: none;" type="file" id="fileInput" accept=".rle">
-                    <button class="need-forbidden" id="selectFile" onclick="document.getElementById('fileInput').click()" >导入</button>
+                    <button class="need-forbidden" onclick="document.getElementById('fileInput').click()" >导入</button>
                     <button class="need-forbidden" onclick="dump()">导出</button>
+                </div>
+                <div id="importFilenameCon" style="display: none;">
+                    <p id="importFilename" style="white-space: nowrap; overflow: hidden;text-overflow: ellipsis; margin-top: 0px; margin-bottom: 0px;"></p>
                 </div>
                 <div>
                     示例: 
@@ -123,8 +132,13 @@
                 invertPointStatus(x, y);
             });
 
+            document.getElementById('styleToggleSwitch').addEventListener('change', function() {
+                conwaySpace.switchStyle();
+            });
+
             function clearCanvas(){
                 clearAll();
+                clearFilename();
                 conwaySpace.fitCanvas();
             }
 
@@ -353,6 +367,7 @@
 
             // 导入rle
             document.getElementById('fileInput').addEventListener('change', (event) => {
+                clearFilename();
                 const file = event.target.files[0]; // 获取用户选择的文件
 
                 if (file) {
@@ -372,6 +387,7 @@
 
                     // 开始读取文件
                     reader.readAsText(file); // 读取为文本
+                    setFilename(file.name);
                 }
             });
 
@@ -582,7 +598,22 @@
 
             // 缩放
             function zoom(scale /*缩放增量*/){
-                conwaySpace.zoom(scale);
+                if(scale > 0){ // 放大
+                    conwaySpace.zoomIn();
+                }else{ // 缩小
+                    conwaySpace.zoomOut();
+                }
+            }
+
+            function clearFilename(){
+                document.getElementById('importFilename').innerText = "";
+                document.getElementById('importFilename').title = '';
+                document.getElementById('importFilenameCon').style.display = "none";
+            }
+            function setFilename(filename){
+                document.getElementById('importFilename').innerText = "文件名:" + filename;
+                document.getElementById('importFilename').title = filename;
+                document.getElementById('importFilenameCon').style.display = "block";
             }
         </script>
 	</body>

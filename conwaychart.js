@@ -18,25 +18,27 @@ class ConwayChart {
     this.pointConsume = pointConsume;
     this.scale = 1; // 默认缩放值: 1
     this.maxScale = 3; // 最大缩放值
-    this.minScale = 0.01; // 最小缩放值
+    this.minScale = 0.00001; // 最小缩放值
     this.step = 0.05;   // 缩放率
     this.offsetX = 0;  // 画布X轴偏移值
     this.offsetY = 0;  // 画布Y轴偏移值
     this.blockWidth = 10; // 方块宽度
     this.editable = false; // 是否可以鼠标点击编辑
     this.selectable = false;  // 是否可以框选
+    this.styleMark = 0;
+    this.style = {
+      pointColor: 'black',
+      gridLineColor: '#ccc',
+      backgroundColor: 'white',
+      selectColor: '#ccffcc'
+    };
+    this.El.style.backgroundColor = this.style.backgroundColor;
     this.selectRange = {  // 框选范围
       ax: 0,
       bx: 0,
       ay: 0,
       by: 0
     };
-
-    // 记录存活点最大最小值
-    this.minX = null;
-    this.maxX = null;
-    this.minY = null;
-    this.maxY = null;
     
     // 添加滚轮判断事件
   	this.addScaleFunc();
@@ -47,9 +49,6 @@ class ConwayChart {
     // 添加点击事件
     this.addClick();
 
-    // 绘制背景网格
-    this.drawGrid();
-
     // 尺寸大小自适应
     const resizeObserver = new ResizeObserver(entries => {
       for (let entry of entries) {
@@ -59,6 +58,28 @@ class ConwayChart {
       }
     });
     resizeObserver.observe(dom);
+  }
+
+  switchStyle(){
+    if(this.styleMark == 1){
+      this.styleMark = 0;
+      this.style = {
+        pointColor: 'black',
+        gridLineColor: '#ccc',
+        backgroundColor: 'white',
+        selectColor: '#ccffcc'
+      };
+    }else{
+      this.styleMark = 1;
+      this.style = {
+        pointColor: 'white',
+        gridLineColor: 'black',
+        backgroundColor: 'black',
+        selectColor: '#4d4d4d'
+      };
+    }
+    this.El.style.backgroundColor = this.style.backgroundColor;
+    this.render();
   }
 
   addClick(){
@@ -114,27 +135,27 @@ class ConwayChart {
     e.preventDefault();
 
     if(e.wheelDelta){
-      var x = e.offsetX - this.offsetX
-      var y = e.offsetY - this.offsetY
+      var x = e.offsetX - this.offsetX;
+      var y = e.offsetY - this.offsetY;
 
-      var offsetX = (x / this.scale) * this.step
-      var offsetY = (y / this.scale) * this.step
+      var offsetX = (x / this.scale) * this.step;
+      var offsetY = (y / this.scale) * this.step;
 
       if(e.wheelDelta > 0){
-        this.offsetX -= this.scale >= this.maxScale ? 0 : offsetX
-        this.offsetY -= this.scale >= this.maxScale ? 0 : offsetY
+        this.offsetX -= this.scale >= this.maxScale ? 0 : offsetX;
+        this.offsetY -= this.scale >= this.maxScale ? 0 : offsetY;
 
-        this.scale += this.step
+        this.scale += this.step;
       } else {
-        this.offsetX += this.scale <= this.minScale ? 0 : offsetX
-        this.offsetY += this.scale <= this.minScale ? 0 : offsetY
+        this.offsetX += this.scale <= this.minScale ? 0 : offsetX;
+        this.offsetY += this.scale <= this.minScale ? 0 : offsetY;
 
-        this.scale -= this.step
+        this.scale -= this.step;
       }
+      
+      this.scale = Math.min(this.maxScale, Math.max(this.scale, this.minScale));
 
-      this.scale = Math.min(this.maxScale, Math.max(this.scale, this.minScale))
-    
-      this.render()
+      this.render();
     }
   }
   
@@ -191,7 +212,7 @@ class ConwayChart {
     this.offsetX = this.mousedownOriginX + (e.offsetX - this.targetX);
     this.offsetY = this.mousedownOriginY + (e.offsetY - this.targetY);
     
-    this.render()
+    this.render();
   }
 
   // 绘制网格
@@ -201,7 +222,7 @@ class ConwayChart {
     }
 
     var ctx = ctx || this.ctx;
-    ctx.strokeStyle = '#ccc'; // 灰色线条
+    ctx.strokeStyle = this.style.gridLineColor; // 灰色线条
     ctx.lineWidth = 1;
     ctx.imageSmoothingEnabled = false;
 
@@ -210,8 +231,8 @@ class ConwayChart {
     let xOffset = this.offsetX / this.scale;
     let yOffset = this.offsetY / this.scale;
 
-    let colCount = ww / this.blockWidth;
-    let rowCount = hh / this.blockWidth;
+    let colCount = Math.ceil(ww / this.blockWidth);
+    let rowCount = Math.ceil(hh / this.blockWidth);
     
     let cOffset = Math.floor(xOffset / this.blockWidth);
     let rOffset = Math.floor(yOffset / this.blockWidth);
@@ -240,30 +261,12 @@ class ConwayChart {
   // 渲染
   render() {
     this.El.width = this.width;
-
+    
     this.ctx.setTransform(this.scale,0, 0, this.scale, this.offsetX, this.offsetY);
     let range = this.getViewRange();
     this.drawSelectRange();
 
-    this.minX = null;
-    this.maxX = null;
-    this.minY = null;
-    this.maxY = null;
-
     this.pointProduce((x, y) => {
-      if(this.minX == null){ this.minX = x; }
-      else{ this.minX = Math.min(this.minX, x); }
-
-      if(this.minY == null){ this.minY = y; }
-      else{ this.minY = Math.min(this.minY, y); }
-      
-      if(this.maxX == null){ this.maxX = x; }
-      else{ this.maxX = Math.max(this.maxX, x); }
-
-      if(this.maxY == null){ this.maxY = y; }
-      else{ this.maxY = Math.max(this.maxY, y); }
-
-
       if(x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY ){
         this.drawBlock(x, y);
       }
@@ -280,7 +283,7 @@ class ConwayChart {
     let x = Math.min(this.selectRange.ax, this.selectRange.bx);
     let y = Math.min(this.selectRange.ay, this.selectRange.by);
     this.ctx.beginPath();
-    this.ctx.fillStyle = '#ccffcc';
+    this.ctx.fillStyle = this.style.selectColor;
     this.ctx.fillRect(x * this.blockWidth, y * this.blockWidth, (xEdge + 1) * this.blockWidth, (yEdge + 1) * this.blockWidth);
   }
 
@@ -289,8 +292,29 @@ class ConwayChart {
     let x = xi * this.blockWidth;
     let y = yi * this.blockWidth;
     this.ctx.beginPath();
-    this.ctx.fillStyle = 'black';
-    this.ctx.fillRect(x, y, this.blockWidth, this.blockWidth);
+    this.ctx.fillStyle = this.style.pointColor;
+
+    let enhance = this.calculateEnhance();
+
+    this.ctx.fillRect(x, y, this.blockWidth * enhance, this.blockWidth * enhance);
+  }
+
+  calculateEnhance(){
+    let enhance = 1;
+    if(this.scale <= 0.00002){  // 使得scale <= 0.00002时, block的scale始终接近0.007
+      enhance = Math.floor(0.007 / this.scale);
+    } else if(this.scale <= 0.0001){  // 使得 0.00002 < scale <= 0.0001 时, block的scale由0.007逐渐增长至0.03
+      enhance = this.enhanceTransition(0.00002, 0.0001, 0.007, 0.03);
+    } else if(this.scale <= 0.02){   // 使得 0.0001 < scale <= 0.02 时, block的scale由0.03逐渐增长至0.1
+      enhance = this.enhanceTransition(0.0001, 0.02, 0.03, 0.1);
+    } else if(this.scale <= 0.1){  // 使得 0.01 < scale <= 0.1时, block的scale始终接近是0.1
+      enhance = Math.floor(0.1 / this.scale);
+    }
+    return enhance;
+  }
+
+  enhanceTransition(startRange, endRange, minBlockScale, maxBlockScale){
+    return Math.floor((minBlockScale + (this.scale - startRange) / (endRange - startRange) * (maxBlockScale - minBlockScale)) / this.scale);
   }
 
   // 获取画布的可视坐标范围
@@ -359,14 +383,43 @@ class ConwayChart {
       this.render();
       return;
     }
-    if(this.minX != null && this.minY != null && this.maxX != null && this.maxY != null){
-      let ww = (this.maxX - this.minX) * this.blockWidth;
-      let hh = (this.maxY - this.minY) * this.blockWidth;
+
+    // 计算图形的重心
+    let sumX = 0;
+    let sumY = 0;
+    let count = 0;
+
+    let minX, minY, maxX, maxY;
+
+    this.pointProduce((x, y) => {
+      if(minX == null){ minX = x; }
+      else{ minX = Math.min(minX, x); }
+
+      if(minY == null){ minY = y; }
+      else{ minY = Math.min(minY, y); }
+      
+      if(maxX == null){ maxX = x; }
+      else{ maxX = Math.max(maxX, x); }
+
+      if(maxY == null){ maxY = y; }
+      else{ maxY = Math.max(maxY, y); }
+
+      sumX += x;
+      sumY += y;
+      count++;
+    });
+
+    if(count > 0){
+      let midX = sumX / count;
+      let midY = sumY / count;
+      
+      let ww = Math.max(midX - minX, maxX - midX) * 2 * this.blockWidth;
+      let hh = Math.max(midY - minY, maxY - midY) * 2 * this.blockWidth;
       let scale = Math.min(this.height / hh, this.width / ww);
       this.scale = Math.min(Math.max(scale, this.minScale), this.maxScale);
 
-      this.offsetX = (0 - this.minX) * this.blockWidth * this.scale;
-      this.offsetY = (0 - this.minY) * this.blockWidth * this.scale;
+      this.offsetX = this.width / 2 - midX * this.blockWidth * this.scale;
+      this.offsetY = this.height / 2 - midY * this.blockWidth * this.scale;
 
       this.render();
     }else{
@@ -377,6 +430,17 @@ class ConwayChart {
     }
   }
 
+  // 放大
+  zoomIn(){
+    this.zoom(this.scale / 10);
+  }
+
+  // 缩小
+  zoomOut(){
+    this.zoom(-(this.scale / 10));
+  }
+
+  // 缩放
   zoom(scaleOffset){
     let oldScale = this.scale;
     let scale = this.scale + scaleOffset;

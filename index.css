@@ -4,10 +4,11 @@ html,body {
     overflow: hidden;
 }
 .conway-space {
-    height: calc(100% - 40px);
+    height: 100%;
+    /* height: calc(100% - 40px); */
     min-height: 500px;
     min-width: 500px;
-    margin: 20px;
+    /* margin: 20px; */
     box-shadow: 0 0 3px orange;
 }
 .eye-button{
@@ -70,7 +71,7 @@ html,body {
     top: 0px;
     position: fixed;
     width: 215px;
-    height: 400px;
+    /* height: 400px; */
     border-radius: 5px;
     background-color: rgba(191,191,191,0.4);
     padding: 5px 10px;
