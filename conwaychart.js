@@ -1,6 +1,6 @@
 class ConwayChart {
   // 初始构造器
-  constructor(dom, pointProduce, pointConsume) {
+  constructor(dom, pointProduce, pointConsume, mousePositionConsume) {
     this.wrapDom = dom;
     var wrapDomStyle = getComputedStyle(dom);
     this.width = parseInt(wrapDomStyle.width, 10);
@@ -15,7 +15,8 @@ class ConwayChart {
     dom.appendChild(this.El);
     
     this.pointProduce = pointProduce;  // 点提供者(conway的点非常多, 所以需要外部提供特殊结构来存储)
-    this.pointConsume = pointConsume;
+    this.pointConsume = pointConsume;  // 点消费者, 画布上添加点之后, 触发
+    this.mousePositionConsume = mousePositionConsume; // 鼠标的x,y位置信息消费者
     this.scale = 1; // 默认缩放值: 1
     this.maxScale = 3; // 最大缩放值
     this.minScale = 0.00001; // 最小缩放值
@@ -39,6 +40,9 @@ class ConwayChart {
       ay: 0,
       by: 0
     };
+
+    // 添加鼠标作为位置监听
+    this.El.addEventListener('mousemove', this.mousePositionListener, false);
     
     // 添加滚轮判断事件
   	this.addScaleFunc();
@@ -181,6 +185,13 @@ class ConwayChart {
       this.mousedownOriginX = this.offsetX;
       this.mousedownOriginY = this.offsetY;
       this.El.addEventListener('mousemove', this.moveCanvasFunc, false);
+    }
+  }
+
+  mousePositionListener = (e) => {
+    if(this.mousePositionConsume){
+      let p = this.mousePosConvertToCoordinate(e.clientX, e.clientY);
+      this.mousePositionConsume(p[0], p[1]);
     }
   }
 

@@ -1,11 +1,10 @@
 function hashlife(){
-    var index = 0;
+    var index = 2;
     function idGenerate(){ // 生成节点id
         return index++;
     }
-
-    const nodeCache = new Array(); // 二维数组, 第一个维度表示深度, 第二个维度存储节点Map
-    const emptyNodes = new Array(); // 没有存活节点的区域, index = depth
+    var emptyNodes = new Array(); // 没有存活节点的区域, index = depth
+    var nodeCache = new Array();
 
     function searchNodeFromCache(node){
         if(node.depth - 1 < nodeCache.length){
@@ -40,6 +39,52 @@ function hashlife(){
         cc = cc.get(node.se._id);
         if(!cc){ cc = new Map(); up.set(node.se._id, cc); }
         cc.set(node.sw._id, node);
+    }
+
+       /**
+     * 垃圾收集与清理
+     * 需要不定期执行垃圾清理, 否则内存会爆
+     */
+    function gc(){
+        if(index < 1000000){ return; } // 小于100w不清理
+        initCache();
+        function refreshToCache(node){
+            if(node.depth > 1){
+                let side = calculateSideLength(node.depth);
+                let halfSide = side >> 1;
+                let empty = createEmptyNode(halfSide);
+                let ne = empty;
+                let nw = empty;
+                let se = empty;
+                let sw = empty;
+                if(halfSide != node.ne.l){ ne = refreshToCache(node.ne); }
+                if(halfSide != node.nw.l){ nw = refreshToCache(node.nw); }
+                if(halfSide != node.se.l){ se = refreshToCache(node.se); }
+                if(halfSide != node.sw.l){ sw = refreshToCache(node.sw); }
+                return buildNode({
+                    depth: node.depth,
+                    ne: ne,
+                    nw: nw,
+                    se: se,
+                    sw: sw
+                });
+            }else{
+                return buildNode({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: node.sw });
+            }
+        }
+        root = refreshToCache(root);
+    }
+
+    // 构建节点, 向缓存中添加节点, 计算节点的附加属性
+    function buildNode(node){
+        let cacheNode = searchNodeFromCache(node);
+        if(cacheNode){
+            node = cacheNode;
+        }else{
+            setNodeToCache(node);
+            calculateNodeLiveEdge(node);
+        }
+        return node;
     }
 
     /*
@@ -86,19 +131,8 @@ function hashlife(){
         node.b = a == halfSide ? (halfSide + Math.min(node.ne.b, node.nw.b)) : a;
     }
 
-    // 向缓存中添加节点
-    function addToCache(node){
-        let cacheNode = searchNodeFromCache(node);
-        if(cacheNode){ return cacheNode; }
-        
-        setNodeToCache(node);
-        calculateNodeLiveEdge(node);
-        return node;
-    }
-
     const c0 = { depth: 0, _id: 0, ne: 0, nw: 0, se: 0, sw: 0 };
     const c1 = { depth: 0, _id: 1, ne: 1, nw: 1, se: 1, sw: 1 };
-    emptyNodes.push(c0);
 
     function createEmptyNode(side){
         if(side < 2){ return c0; }
@@ -108,7 +142,7 @@ function hashlife(){
             return emptyNodes[depth];
         }else if(depth == emptyNodes.length){
             let emp = emptyNodes[depth - 1];
-            let nn = addToCache({
+            let nn = buildNode({
                 depth: depth, ne: emp, nw: emp, se: emp, sw: emp
             });
             emptyNodes.push(nn);
@@ -122,24 +156,26 @@ function hashlife(){
     }
 
     function initCache(){
-        let firstMap = new Map();
-        nodeCache.push(firstMap);
-        addToCache({depth: 1, ne: c0, nw: c0, se: c0, sw: c0});
-        addToCache({depth: 1, ne: c1, nw: c0, se: c0, sw: c0});
-        addToCache({depth: 1, ne: c0, nw: c1, se: c0, sw: c0});
-        addToCache({depth: 1, ne: c1, nw: c1, se: c0, sw: c0});
-        addToCache({depth: 1, ne: c0, nw: c0, se: c1, sw: c0});
-        addToCache({depth: 1, ne: c1, nw: c0, se: c1, sw: c0});
-        addToCache({depth: 1, ne: c0, nw: c1, se: c1, sw: c0});
-        addToCache({depth: 1, ne: c1, nw: c1, se: c1, sw: c0});
-        addToCache({depth: 1, ne: c0, nw: c0, se: c0, sw: c1});
-        addToCache({depth: 1, ne: c1, nw: c0, se: c0, sw: c1});
-        addToCache({depth: 1, ne: c0, nw: c1, se: c0, sw: c1});
-        addToCache({depth: 1, ne: c1, nw: c1, se: c0, sw: c1});
-        addToCache({depth: 1, ne: c0, nw: c0, se: c1, sw: c1});
-        addToCache({depth: 1, ne: c1, nw: c0, se: c1, sw: c1});
-        addToCache({depth: 1, ne: c0, nw: c1, se: c1, sw: c1});
-        addToCache({depth: 1, ne: c1, nw: c1, se: c1, sw: c1});
+        index = 2;
+        nodeCache = new Array();
+        emptyNodes = new Array();
+        emptyNodes.push(c0);
+        buildNode({depth: 1, ne: c0, nw: c0, se: c0, sw: c0});
+        buildNode({depth: 1, ne: c1, nw: c0, se: c0, sw: c0});
+        buildNode({depth: 1, ne: c0, nw: c1, se: c0, sw: c0});
+        buildNode({depth: 1, ne: c1, nw: c1, se: c0, sw: c0});
+        buildNode({depth: 1, ne: c0, nw: c0, se: c1, sw: c0});
+        buildNode({depth: 1, ne: c1, nw: c0, se: c1, sw: c0});
+        buildNode({depth: 1, ne: c0, nw: c1, se: c1, sw: c0});
+        buildNode({depth: 1, ne: c1, nw: c1, se: c1, sw: c0});
+        buildNode({depth: 1, ne: c0, nw: c0, se: c0, sw: c1});
+        buildNode({depth: 1, ne: c1, nw: c0, se: c0, sw: c1});
+        buildNode({depth: 1, ne: c0, nw: c1, se: c0, sw: c1});
+        buildNode({depth: 1, ne: c1, nw: c1, se: c0, sw: c1});
+        buildNode({depth: 1, ne: c0, nw: c0, se: c1, sw: c1});
+        buildNode({depth: 1, ne: c1, nw: c0, se: c1, sw: c1});
+        buildNode({depth: 1, ne: c0, nw: c1, se: c1, sw: c1});
+        buildNode({depth: 1, ne: c1, nw: c1, se: c1, sw: c1});
     }
     initCache();
 
@@ -184,12 +220,12 @@ function hashlife(){
         let side = calculateSideLength(node.ne.depth)
         let emptyNode = createEmptyNode(side);
 
-        let ne = addToCache({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: emptyNode, sw: node.ne });
-        let nw = addToCache({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: node.nw, sw: emptyNode });
-        let se = addToCache({ depth: node.depth, ne: emptyNode, nw: node.se, se: emptyNode, sw: emptyNode });
-        let sw = addToCache({ depth: node.depth, ne: node.sw, nw: emptyNode, se: emptyNode, sw: emptyNode });
+        let ne = buildNode({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: emptyNode, sw: node.ne });
+        let nw = buildNode({ depth: node.depth, ne: emptyNode, nw: emptyNode, se: node.nw, sw: emptyNode });
+        let se = buildNode({ depth: node.depth, ne: emptyNode, nw: node.se, se: emptyNode, sw: emptyNode });
+        let sw = buildNode({ depth: node.depth, ne: node.sw, nw: emptyNode, se: emptyNode, sw: emptyNode });
 
-        return addToCache({ depth: node.depth + 1, ne: ne, nw: nw, se: se, sw: sw });
+        return buildNode({ depth: node.depth + 1, ne: ne, nw: nw, se: se, sw: sw });
     }
 
     
@@ -210,7 +246,7 @@ function hashlife(){
             let p3c = node.nw.se._id + node.nw.sw._id + node.ne.sw._id + node.se.nw._id + node.se.sw._id + node.sw.nw._id + node.sw.sw._id + node.sw.se._id;
 
             // 节点存活计算
-            result = addToCache({
+            result = buildNode({
                 depth: 1,
                 ne: (node.ne.sw._id == 1 ? (rule.S.includes(p0c) ? c1 : c0) : (rule.B.includes(p0c) ? c1 : c0)),
                 nw: (node.nw.se._id == 1 ? (rule.S.includes(p1c) ? c1 : c0) : (rule.B.includes(p1c) ? c1 : c0)),
@@ -227,35 +263,36 @@ function hashlife(){
              */
             let node1, node2, node3, node4, node5, node6, node7, node8, node9;
             let cDepth = node.depth - 1;
-            let ff = fastForward && node.depth < 8; // 层级太高时, 不进行跳代, 防止程序卡顿
+            let ff = fastForward && node.depth < 20; // 层级太高时, 不进行跳代, 防止程序卡顿
+            // let ff = fastForward; // 层级太高时, 不进行跳代, 防止程序卡顿
             if(ff){ // 快进
                 node1 = evolve(node.nw, fastForward, rule);
-                node2 = evolve(addToCache({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }), fastForward, rule);
+                node2 = evolve(buildNode({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }), fastForward, rule);
                 node3 = evolve(node.ne, fastForward, rule);
-                node4 = evolve(addToCache({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }), fastForward, rule);
-                node5 = evolve(addToCache({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }), fastForward, rule);
-                node6 = evolve(addToCache({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }), fastForward, rule);
+                node4 = evolve(buildNode({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }), fastForward, rule);
+                node5 = evolve(buildNode({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }), fastForward, rule);
+                node6 = evolve(buildNode({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }), fastForward, rule);
                 node7 = evolve(node.sw, fastForward, rule);
-                node8 = evolve(addToCache({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }), fastForward, rule);
+                node8 = evolve(buildNode({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }), fastForward, rule);
                 node9 = evolve(node.se, fastForward, rule);
             }else{
                 let dd = node.depth - 2;
-                node1 = addToCache({depth: dd, ne : node.nw.ne.sw, nw : node.nw.nw.se, sw : node.nw.sw.ne, se : node.nw.se.nw });
-                node2 = addToCache({depth: dd, ne : node.ne.nw.sw, nw : node.nw.ne.se, sw : node.nw.se.ne, se : node.ne.sw.nw });
-                node3 = addToCache({depth: dd, ne : node.ne.ne.sw, nw : node.ne.nw.se, sw : node.ne.sw.ne, se : node.ne.se.nw });
-                node4 = addToCache({depth: dd, ne : node.nw.se.sw, nw : node.nw.sw.se, sw : node.sw.nw.ne, se : node.sw.ne.nw });
-                node5 = addToCache({depth: dd, ne : node.ne.sw.sw, nw : node.nw.se.se, sw : node.sw.ne.ne, se : node.se.nw.nw });
-                node6 = addToCache({depth: dd, ne : node.ne.se.sw, nw : node.ne.sw.se, sw : node.se.nw.ne, se : node.se.ne.nw });
-                node7 = addToCache({depth: dd, ne : node.sw.ne.sw, nw : node.sw.nw.se, sw : node.sw.sw.ne, se : node.sw.se.nw });
-                node8 = addToCache({depth: dd, ne : node.se.nw.sw, nw : node.sw.ne.se, sw : node.sw.se.ne, se : node.se.sw.nw });
-                node9 = addToCache({depth: dd, ne : node.se.ne.sw, nw : node.se.nw.se, sw : node.se.sw.ne, se : node.se.se.nw });
+                node1 = buildNode({depth: dd, ne : node.nw.ne.sw, nw : node.nw.nw.se, sw : node.nw.sw.ne, se : node.nw.se.nw });
+                node2 = buildNode({depth: dd, ne : node.ne.nw.sw, nw : node.nw.ne.se, sw : node.nw.se.ne, se : node.ne.sw.nw });
+                node3 = buildNode({depth: dd, ne : node.ne.ne.sw, nw : node.ne.nw.se, sw : node.ne.sw.ne, se : node.ne.se.nw });
+                node4 = buildNode({depth: dd, ne : node.nw.se.sw, nw : node.nw.sw.se, sw : node.sw.nw.ne, se : node.sw.ne.nw });
+                node5 = buildNode({depth: dd, ne : node.ne.sw.sw, nw : node.nw.se.se, sw : node.sw.ne.ne, se : node.se.nw.nw });
+                node6 = buildNode({depth: dd, ne : node.ne.se.sw, nw : node.ne.sw.se, sw : node.se.nw.ne, se : node.se.ne.nw });
+                node7 = buildNode({depth: dd, ne : node.sw.ne.sw, nw : node.sw.nw.se, sw : node.sw.sw.ne, se : node.sw.se.nw });
+                node8 = buildNode({depth: dd, ne : node.se.nw.sw, nw : node.sw.ne.se, sw : node.sw.se.ne, se : node.se.sw.nw });
+                node9 = buildNode({depth: dd, ne : node.se.ne.sw, nw : node.se.nw.se, sw : node.se.sw.ne, se : node.se.se.nw });
             }
-            result = addToCache({
+            result = buildNode({
                 depth: cDepth,
-                ne: evolve(addToCache({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6}), fastForward, rule),
-                nw: evolve(addToCache({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5}), fastForward, rule),
-                sw: evolve(addToCache({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8}), fastForward, rule),
-                se: evolve(addToCache({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}), fastForward, rule)
+                ne: evolve(buildNode({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6}), fastForward, rule),
+                nw: evolve(buildNode({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5}), fastForward, rule),
+                sw: evolve(buildNode({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8}), fastForward, rule),
+                se: evolve(buildNode({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}), fastForward, rule)
             });
         }
         if(fastForward){
@@ -271,51 +308,51 @@ function hashlife(){
     /**
      *            ↑
      *            |
-     *     1      |      0
+     *     3      |      2
      *            |
      * -----------+-------------->
      *            |
-     *     3      |      2
+     *     1      |      0
      *            |
      *            |
      */
     function updatePointStatus(node, x, y, producer){
         let direction = (x < 0 ? 1 : 0) | ((y < 0 ? 1 : 0) << 1);
         if(node.depth == 1){
-            if(direction == 0){
-                let m = producer(node.ne._id);
-                let cMark = m == 0 ? c0 : c1;
-                return addToCache({ depth: 1, ne: cMark, nw: node.nw, se: node.se, sw: node.sw });
-            }else if(direction == 1){
-                let m = producer(node.nw._id);
-                let cMark = m == 0 ? c0 : c1;
-                return addToCache({ depth: 1, ne: node.ne, nw: cMark, se: node.se, sw: node.sw });
-            }else if(direction == 2){
+            if(direction == 0){  // se
                 let m = producer(node.se._id);
                 let cMark = m == 0 ? c0 : c1;
-                return addToCache({ depth: 1, ne: node.ne, nw: node.nw, se: cMark, sw: node.sw });
-            }else{
+                return buildNode({ depth: 1, ne: node.ne, nw: node.nw, se: cMark, sw: node.sw });
+            }else if(direction == 1){  // sw
                 let m = producer(node.sw._id);
                 let cMark = m == 0 ? c0 : c1;
-                return addToCache({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: cMark });
+                return buildNode({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: cMark });
+            }else if(direction == 2){  // ne
+                let m = producer(node.ne._id);
+                let cMark = m == 0 ? c0 : c1;
+                return buildNode({ depth: 1, ne: cMark, nw: node.nw, se: node.se, sw: node.sw });
+            }else{  // nw
+                let m = producer(node.nw._id);
+                let cMark = m == 0 ? c0 : c1;
+                return buildNode({ depth: 1, ne: node.ne, nw: cMark, se: node.se, sw: node.sw });
             }
         }else {
             let offset = calculateSideLength(node.depth) >> 2;
-            if(direction == 0){
-                return addToCache({
-                    depth: node.depth, ne: updatePointStatus(node.ne, x - offset, y - offset, producer), nw: node.nw, se: node.se, sw: node.sw
+            if(direction == 0){  // se
+                return buildNode({
+                    depth: node.depth, ne: node.ne, nw: node.nw, se: updatePointStatus(node.se, x - offset, y - offset, producer), sw: node.sw
                 });
-            }else if(direction == 1){
-                return addToCache({
-                    depth: node.depth, ne: node.ne, nw: updatePointStatus(node.nw, x + offset, y - offset, producer), se: node.se, sw: node.sw
+            }else if(direction == 1){  // sw
+                return buildNode({
+                    depth: node.depth, ne: node.ne, nw: node.nw, se: node.se, sw: updatePointStatus(node.sw, x + offset, y - offset, producer)
                 });
-            }else if(direction == 2){
-                return addToCache({
-                    depth: node.depth, ne: node.ne, nw: node.nw, se: updatePointStatus(node.se, x - offset, y + offset, producer), sw: node.sw
+            }else if(direction == 2){  // ne
+                return buildNode({
+                    depth: node.depth, ne: updatePointStatus(node.ne, x - offset, y + offset, producer), nw: node.nw, se: node.se, sw: node.sw
                 });
-            }else{
-                return addToCache({
-                    depth: node.depth, ne: node.ne, nw: node.nw, se: node.se, sw: updatePointStatus(node.sw, x + offset, y + offset, producer)
+            }else{  // nw
+                return buildNode({
+                    depth: node.depth, ne: node.ne, nw: updatePointStatus(node.nw, x + offset, y + offset, producer), se: node.se, sw: node.sw
                 });
             }
         }
@@ -325,45 +362,45 @@ function hashlife(){
      * 获取指定节点状态
      */
     function getPointStatus(node, x, y){
-        let direction = (x < 0 ? 1 : 0) | ((y < 0 ? 1 : 0) << 1);
+        let direction = (x <= 0 ? 1 : 0) | ((y <= 0 ? 1 : 0) << 1);
         if(node.depth == 1){
-            if(direction == 0){
-                return node.ne._id;
-            }else if(direction == 1){
-                return node.nw._id;
-            }else if(direction == 2){
+            if(direction == 0){  // se
                 return node.se._id;
-            }else{
+            }else if(direction == 1){  // sw
                 return node.sw._id;
+            }else if(direction == 2){  // ne
+                return node.ne._id;
+            }else{  // nw
+                return node.nw._id;
             }
         }else {
             let offset = calculateSideLength(node.depth) >> 2;
-            if(direction == 0){
-                return getPointStatus(node.ne, x - offset, y - offset);
-            }else if(direction == 1){
-                return getPointStatus(node.nw, x + offset, y - offset);
-            }else if(direction == 2){
-                return getPointStatus(node.se, x - offset, y + offset);
-            }else{
-                return getPointStatus(node.sw, x + offset, y + offset);
+            if(direction == 0){  // se
+                return getPointStatus(node.se, x - offset, y - offset);
+            }else if(direction == 1){  // sw
+                return getPointStatus(node.sw, x + offset, y - offset);
+            }else if(direction == 2){  // ne
+                return getPointStatus(node.ne, x - offset, y + offset);
+            }else{  // nw
+                return getPointStatus(node.nw, x + offset, y + offset);
             }
         }
     }
 
     function traverse(node, callback, centerX, centerY){
         if(node.depth == 1){
-            if(node.ne._id == 1){ callback(centerX, centerY); }
-            if(node.nw._id == 1){ callback(centerX - 1, centerY); }
-            if(node.se._id == 1){ callback(centerX, centerY - 1); }
-            if(node.sw._id == 1){ callback(centerX - 1, centerY - 1); }
+            if(node.ne._id == 1){ callback(centerX, centerY - 1); }
+            if(node.nw._id == 1){ callback(centerX - 1, centerY - 1); }
+            if(node.se._id == 1){ callback(centerX, centerY); }
+            if(node.sw._id == 1){ callback(centerX - 1, centerY); }
         }else{
             let side = calculateSideLength(node.depth);
             let halfSide = side >> 1;
             let offset = side >> 2;
-            if(halfSide != node.ne.l){ traverse(node.ne, callback, centerX + offset, centerY + offset); }
-            if(halfSide != node.nw.l){ traverse(node.nw, callback, centerX - offset, centerY + offset); }
-            if(halfSide != node.se.l){ traverse(node.se, callback, centerX + offset, centerY - offset); }
-            if(halfSide != node.sw.l){ traverse(node.sw, callback, centerX - offset, centerY - offset); }
+            if(halfSide != node.ne.l){ traverse(node.ne, callback, centerX + offset, centerY - offset); }
+            if(halfSide != node.nw.l){ traverse(node.nw, callback, centerX - offset, centerY - offset); }
+            if(halfSide != node.se.l){ traverse(node.se, callback, centerX + offset, centerY + offset); }
+            if(halfSide != node.sw.l){ traverse(node.sw, callback, centerX - offset, centerY + offset); }
         }
     }
 
@@ -383,6 +420,7 @@ function hashlife(){
             rootSide = calculateSideLength(root.depth);
         }
         root = updatePointStatus(root, x, y, producer);
+        gc();
     }
 
     /**
@@ -390,6 +428,159 @@ function hashlife(){
      */
     hl.addPoint = function(x, y){
         modifyPointStatus(x, y, o => { return 1; });
+    }
+
+    /**
+     * 批量添加点
+     * points结构(必须是有序结构):
+     * [
+     *     {
+     *          y: 0,
+     *          xArr : [ 0, 1, 2, 3 ]
+     *     },
+     *     {
+     *          y: 1,
+     *          xArr : [ 1 ]
+     *     }
+     * ]
+     */
+    hl.drawPoints = function(points){
+        if(points.length == 0){ return; }
+
+        initCache();
+        
+        let minX = Number.MAX_SAFE_INTEGER;
+        let minY = Number.MAX_SAFE_INTEGER;
+        let maxX = Number.MIN_SAFE_INTEGER;
+        let maxY = Number.MIN_SAFE_INTEGER;
+
+        for(let line of points){
+            let arr = new Array();
+            for(let x of line.xArr){
+                arr.push({
+                    x: x,
+                    v: 0
+                });
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+            }
+            line.xArr = arr;
+            minY = Math.min(line.y, minY);
+            maxY = Math.max(line.y, maxY);
+        }
+
+        let sideX = nextPowerOfTwo(maxX - minX + 1);
+        let sideY = nextPowerOfTwo(maxY - minY + 1);
+        let side = Math.max(sideX, sideY);
+        maxX = minX + side - 1;
+        maxY = minY + side - 1;
+
+        let lineChecker = function(line, target){
+            if(line.y == target){ return 0; }
+            else if(line.y > target){ return 1; }
+            else { return -1; }
+        }
+        let xChecker = function(xObj, target){
+            if(xObj.x == target){ return 0; }
+            else if(xObj.x > target){ return 1; }
+            else { return -1; }
+        }
+        let checkAndDelCoor = function(x, y, points){
+            let line = binSearch(y, lineChecker, points);
+            if(line != null){
+                let obj = binSearch(x, xChecker, line.xArr);
+                if(obj != null){ 
+                    obj.v = 1; // 标记为已绘制
+                    return true;
+                } 
+            }
+            return false;
+        }
+        let binSearch = function(target, checker, arr){
+            let low = 0;
+            let high = arr.length - 1;
+            let mid = 0;
+            while(low <= high){
+                mid = low + ((high - low) >> 1);
+                let c = checker(arr[mid], target);
+                if(c == 0){  // 相等
+                    return arr[mid];
+                }else if(c > 0){  // 大于, 向下半区域搜索
+                    high = mid - 1;
+                }else{
+                    low = mid + 1;
+                }
+            }
+            return null;
+        }
+
+        function updatePointRegion(node, x, y, points, offsetX, offsetY){
+            let direction = (x < 0 ? 1 : 0) | ((y < 0 ? 1 : 0) << 1);
+            if(node.depth == 1){
+                let ne = c0, se = c0, nw = c0, sw = c0;
+                let xi = x + offsetX;
+                let yi = y + offsetY;
+                if(direction == 0){  // se
+                    se = c1;
+                    if(checkAndDelCoor(xi, yi - 1, points)){ ne = c1; }
+                    if(checkAndDelCoor(xi - 1, yi - 1, points)){ nw = c1; }
+                    if(checkAndDelCoor(xi - 1, yi, points)){ sw = c1; }
+                }else if(direction == 1){  // sw
+                    sw = c1;
+                    if(checkAndDelCoor(xi + 1, yi - 1, points)){ ne = c1; }
+                    if(checkAndDelCoor(xi, yi - 1, points)){ nw = c1; }
+                    if(checkAndDelCoor(xi + 1, yi, points)){ se = c1; }
+                }else if(direction == 2){  // ne
+                    ne = c1;
+                    if(checkAndDelCoor(xi - 1, yi, points)){ nw = c1; }
+                    if(checkAndDelCoor(xi, yi + 1, points)){ se = c1; }
+                    if(checkAndDelCoor(xi - 1, yi + 1, points)){ sw = c1; }
+                }else{  // nw
+                    nw = c1;
+                    if(checkAndDelCoor(xi + 1, yi, points)){ ne = c1; }
+                    if(checkAndDelCoor(xi + 1, yi + 1, points)){ se = c1; }
+                    if(checkAndDelCoor(xi, yi + 1, points)){ sw = c1; }
+                }
+                return buildNode({
+                    depth: 1,
+                    ne: ne,
+                    nw: nw,
+                    se: se,
+                    sw: sw
+                });
+            }else {
+                let offset = calculateSideLength(node.depth) >> 2;
+                if(direction == 0){  // se
+                    return buildNode({
+                        depth: node.depth, ne: node.ne, nw: node.nw, se: updatePointRegion(node.se, x - offset, y - offset, points, offsetX + offset, offsetY + offset), sw: node.sw
+                    });
+                }else if(direction == 1){  // sw
+                    return buildNode({
+                        depth: node.depth, ne: node.ne, nw: node.nw, se: node.se, sw: updatePointRegion(node.sw, x + offset, y - offset, points, offsetX - offset, offsetY + offset)
+                    });
+                }else if(direction == 2){  // ne
+                    return buildNode({
+                        depth: node.depth, ne: updatePointRegion(node.ne, x - offset, y + offset, points, offsetX + offset, offsetY - offset), nw: node.nw, se: node.se, sw: node.sw
+                    });
+                }else{  // nw
+                    return buildNode({
+                        depth: node.depth, ne: node.ne, nw: updatePointRegion(node.nw, x + offset, y + offset, points, offsetX - offset, offsetY - offset), se: node.se, sw: node.sw
+                    });
+                }
+            }
+        }
+
+        let tree = createEmptyNode(side << 1);
+        for(let line of points){
+            let y = line.y;
+            for(let x of line.xArr){
+                if(x.v != 1){
+                    tree = updatePointRegion(tree, x.x, y, points, 0, 0);
+                }
+            }
+        }
+        root = tree;
+        gc();
     }
 
     /**
@@ -433,6 +624,7 @@ function hashlife(){
             }
         }
         root = evolve(extendNode(root), fastForward, rule);
+        gc();
     }
 
     const ruleCache = new Map();
@@ -474,6 +666,7 @@ function hashlife(){
      */
     hl.clear = function(){
         root = createEmptyNode(4);
+        gc();
     }
 
     /**
@@ -485,6 +678,13 @@ function hashlife(){
 
     hl.getSideLength = function(){
         return calculateSideLength(root.depth);
+    }
+
+    hl.test = function(){
+        // console.log(root);
+        console.log(nodeCache.length, index);
+        // console.log(nodeHolder.size, index);
+        // time = 0;
     }
 
     return hl;
