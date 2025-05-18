@@ -11,7 +11,6 @@ class ConwayChart {
     this.El.height = this.height;
     this.El.width = this.width;
     this.ctx = this.El.getContext('2d');
-
     dom.appendChild(this.El);
     
     this.pointProduce = pointProduce;  // 点提供者(conway的点非常多, 所以需要外部提供特殊结构来存储)
@@ -28,10 +27,10 @@ class ConwayChart {
     this.selectable = false;  // 是否可以框选
     this.styleMark = 0;
     this.style = {
-      pointColor: 'black',
-      gridLineColor: '#ccc',
-      backgroundColor: 'white',
-      selectColor: '#ccffcc'
+      pointColor: { r: 0, g: 0, b: 0 },
+      gridLineColor: { r: 204, g: 204, b: 204 },
+      backgroundColor: { r: 255, g: 255, b: 255 },
+      selectColor: { r: 204, g: 255, b: 204 }
     };
     this.El.style.backgroundColor = this.style.backgroundColor;
     this.selectRange = {  // 框选范围
@@ -39,6 +38,16 @@ class ConwayChart {
       bx: 0,
       ay: 0,
       by: 0
+    };
+
+    this.imageData = this.ctx.createImageData(this.El.width, this.El.height);
+    this.imageDataBuffer = new Int32Array(this.imageData.data.buffer);
+    this.drawBackground();
+
+    this.preChartStatus = {  // 记录图像状态, 用来判断是否有变化需要重绘
+      scale: this.scale,
+      offsetX: this.offsetX,
+      offsetY: this.offsetY
     };
 
     // 添加鼠标作为位置监听
@@ -56,8 +65,8 @@ class ConwayChart {
     // 尺寸大小自适应
     const resizeObserver = new ResizeObserver(entries => {
       for (let entry of entries) {
-        this.width = entry.contentRect.width;
-        this.height = entry.contentRect.height;
+        this.width = Math.round(entry.contentRect.width);
+        this.height = Math.round(entry.contentRect.height);
         this.render();
       }
     });
@@ -68,18 +77,18 @@ class ConwayChart {
     if(this.styleMark == 1){
       this.styleMark = 0;
       this.style = {
-        pointColor: 'black',
-        gridLineColor: '#ccc',
-        backgroundColor: 'white',
-        selectColor: '#ccffcc'
+        pointColor: { r: 0, g: 0, b: 0 },
+        gridLineColor: { r: 204, g: 204, b: 204 },
+        backgroundColor: { r: 255, g: 255, b: 255 },
+        selectColor: { r: 204, g: 255, b: 204 }
       };
     }else{
       this.styleMark = 1;
       this.style = {
-        pointColor: 'white',
-        gridLineColor: 'black',
-        backgroundColor: 'black',
-        selectColor: '#4d4d4d'
+        pointColor: { r: 255, g: 255, b: 255 },
+        gridLineColor: { r: 0, g: 0, b: 0 },
+        backgroundColor: { r: 0, g: 0, b: 0 },
+        selectColor: { r: 77, g: 77, b: 77 }
       };
     }
     this.El.style.backgroundColor = this.style.backgroundColor;
@@ -142,8 +151,8 @@ class ConwayChart {
       var x = e.offsetX - this.offsetX;
       var y = e.offsetY - this.offsetY;
 
-      var offsetX = (x / this.scale) * this.step;
-      var offsetY = (y / this.scale) * this.step;
+      var offsetX = Math.round((x / this.scale) * this.step);
+      var offsetY = Math.round((y / this.scale) * this.step);
 
       if(e.wheelDelta > 0){
         this.offsetX -= this.scale >= this.maxScale ? 0 : offsetX;
@@ -220,65 +229,82 @@ class ConwayChart {
 
   // 移动画布
   moveCanvasFunc = (e) => {
-    this.offsetX = this.mousedownOriginX + (e.offsetX - this.targetX);
-    this.offsetY = this.mousedownOriginY + (e.offsetY - this.targetY);
+    this.offsetX = Math.round(this.mousedownOriginX + (e.offsetX - this.targetX));
+    this.offsetY = Math.round(this.mousedownOriginY + (e.offsetY - this.targetY));
     
     this.render();
   }
 
-  // 绘制网格
-  drawGrid(){
-    if(this.scale < 0.5){ // 如果缩放过小, 就不画网格了
-      return;
+    // 判断图像状态是否有变化
+    isChartStatusChange(){
+      if(this.preChartStatus.scale != this.scale || this.preChartStatus.offsetX != this.offsetX || this.preChartStatus.offsetY != this.offsetY){
+        this.preChartStatus.scale = this.scale;
+        this.preChartStatus.offsetX = this.offsetX;
+        this.preChartStatus.offsetY = this.offsetY;
+        return true;
+      }
+      return false;
     }
-
-    var ctx = ctx || this.ctx;
-    ctx.strokeStyle = this.style.gridLineColor; // 线条颜色
-    ctx.lineWidth = 1;
-    ctx.imageSmoothingEnabled = false;
-    
-    let blockWidth = this.blockWidth * this.scale;
-    let offsetX = this.offsetX - blockWidth * Math.floor(this.offsetX / blockWidth);
-    let offsetY = this.offsetY - blockWidth * Math.floor(this.offsetY / blockWidth);
-
-    let colCount = Math.ceil(this.width / blockWidth);
-    let rowCount = Math.ceil(this.height / blockWidth);
-    
-    // 绘制垂直线
-    for (let c = 0; c <= colCount; c++) {
-      ctx.beginPath();
-      let xx = c * blockWidth + offsetX;
-      ctx.moveTo(xx, 0);
-      ctx.lineTo(xx, this.height);
-      ctx.stroke();
-    }
-  
-    // 绘制水平线
-    for (let r = 0; r <= rowCount; r++) {
-        ctx.beginPath();
-        let yy = r * blockWidth + offsetY;
-        ctx.moveTo(0, yy);
-        ctx.lineTo(this.width, yy);
-        ctx.stroke();
-    }
-  }
 
   // 渲染
   render() {
     this.El.width = this.width;
+    this.El.height = this.height;
     
-    let range = this.getViewRange();
-    this.drawSelectRange();
+    const self = this;
+    function animate(){
+      self.drawBackground();  // 绘制背景
 
-    this.pointProduce((x, y) => {
-      if(x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY ){
-        this.drawBlock(x, y);
+      let offsetX = Math.round(self.offsetX);
+      let offsetY = Math.round(self.offsetY);
+      let blockWidth = self.blockWidth * self.scale;
+
+      self.drawSelectRange(offsetX, offsetY, blockWidth);  // 绘制选区
+  
+      let range = self.getViewRange();
+      // 绘制点
+      self.pointProduce((x, y) => {
+        if(x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY){
+          let xi = x * blockWidth + offsetX;
+          let yi = y * blockWidth + offsetY;
+          if(xi <= self.width && yi <= self.height){
+            self.drawBlock(Math.round(xi), Math.round(yi), blockWidth);
+          }
+        }
+      });
+
+      if(blockWidth > 5){
+        let x = Math.ceil((0 - offsetX) / blockWidth);
+        let y = Math.ceil((0 - offsetY) / blockWidth);
+        let xi = x * blockWidth + offsetX;
+        let yi = y * blockWidth + offsetY;
+        // 绘制网格
+        self.drawGrid(xi, yi, blockWidth);
       }
-    });
-    this.drawGrid();
+  
+      // 渲染
+      self.ctx.putImageData(self.imageData, 0, 0);
+
+      if(self.isChartStatusChange()){
+        requestAnimationFrame(animate);
+      }
+    }
+
+    requestAnimationFrame(animate);
   }
 
-  drawSelectRange(){
+  // 绘制背景
+  drawBackground(){
+    var bgColor = this.style.backgroundColor.r | this.style.backgroundColor.g << 8 | this.style.backgroundColor.b << 16 | 0xFF << 24;
+    var count = Math.round(this.width * this.height);
+    for(var i = 0; i < count; i++)
+    {
+      this.imageDataBuffer[i] = bgColor;
+    }
+  }
+
+  // 绘制框选区域
+  drawSelectRange(offsetX, offsetY, unit){
     let selectRange = this.getSelectedRange();
     if(!selectRange){ return; }
     let xEdge = selectRange.bx - selectRange.ax;
@@ -292,31 +318,74 @@ class ConwayChart {
     let startY = Math.max(selectRange.ay, range.minY);
     let endX = Math.min(selectRange.bx, range.maxX);
     let endY = Math.min(selectRange.by, range.maxY);
-    xEdge = endX - startX;
-    yEdge = endY - startY;
     if(endY - startY <= 0 || endX - startX <= 0){
       return;
     }
 
-    let blockWidth = this.blockWidth * this.scale;
-
-    this.ctx.beginPath();
-    this.ctx.fillStyle = this.style.selectColor;
-    this.ctx.fillRect(startX * blockWidth + this.offsetX, startY * blockWidth + this.offsetY, (xEdge + 1) * blockWidth, (yEdge + 1) * blockWidth);
+    let startXi = Math.round(startX * unit + offsetX);
+    let startYi = Math.round(startY * unit + offsetY);
+    let width = Math.round((endX + 1) * unit + offsetX) - startXi;
+    let height = Math.round((endY + 1) * unit + offsetY) - startYi;
+    let start = startYi * this.width + startXi;
+    let skipRows = Math.round(this.width);
+    let color = this.style.selectColor.r | this.style.selectColor.g << 8 | this.style.selectColor.b << 16 | 0xFF << 24;
+    for(let i = 0; i < height; i++){
+      for(let j = 0; j < width; j++){
+        this.imageDataBuffer[start + j] = color;
+      }
+      start += skipRows;
+    }
   }
 
-  // 绘制块方法 
-  drawBlock(xi, yi) {
-    let blockWidth = this.blockWidth * this.scale;
+  // 绘制网格
+  drawGrid(decimalStartX, decimalStartY, unit){
+    let lineColor = this.style.gridLineColor.r | this.style.gridLineColor.g << 8 | this.style.gridLineColor.b << 16 | 0xFF << 24;
+    let colCount = Math.ceil(this.width / unit);
+    let rowCount = Math.ceil(this.height / unit);
+    
+    // 绘制垂直线
+    for (let c = 0; c <= colCount; c++) {
+      let xx = Math.round(c * unit + decimalStartX);
+      if(xx > this.width){ continue; }
+      for(let r = 0; r < this.height; r++){
+        this.imageDataBuffer[this.width * r + xx] = lineColor;
+      }
+    }
+  
+    // 绘制水平线
+    for (let r = 0; r <= rowCount; r++) {
+        let yy = Math.round(r * unit + decimalStartY);
+        if(yy > this.height){ continue; }
+        for(let w = 0; w < this.width; w++){
+          this.imageDataBuffer[this.width * yy + w] = lineColor;
+        }
+    }
+  }
 
-    let x = xi * blockWidth + this.offsetX;
-    let y = yi * blockWidth + this.offsetY;
-    this.ctx.beginPath();
-    this.ctx.fillStyle = this.style.pointColor;
-
+  // 绘制块
+  drawBlock(x, y, unit) {
     let enhance = this.calculateEnhance();
+    let blockWidth = Math.max(Math.round(unit * enhance), 1);
 
-    this.ctx.fillRect(x, y, blockWidth * enhance, blockWidth * enhance);
+    let width = blockWidth, height = blockWidth;
+    if(x < 0){ width += x; x = 0; }  // 裁切左边界
+    if(y < 0){ height += y; y = 0; }  // 裁切上边界
+    if(x + width > this.width){ width = this.width - x; } // 裁切右边界
+    if(y + height > this.height){ height = this.height - y; } // 裁切下边界
+
+    width = Math.round(width);
+    height = Math.round(height);
+    if(width <= 0 || height <= 0){ return; }
+    let start = Math.round(x + y * this.width);
+
+    let skipRows = Math.round(this.width);
+    let color = this.style.pointColor.r | this.style.pointColor.g << 8 | this.style.pointColor.b << 16 | 0xFF << 24;
+    for(let i = 0; i < height; i++){
+      for(let j = 0; j < width; j++){
+        this.imageDataBuffer[start + j] = color;
+      }
+      start += skipRows;
+    }
   }
 
   calculateEnhance(){
@@ -386,6 +455,7 @@ class ConwayChart {
 
   // 画布大小自适应
   fitCanvas(){
+    // return;
     // 如果选择区域不空, 对选择区域进行自适应
     let xEdge = Math.abs(this.selectRange.ax - this.selectRange.bx);
     let yEdge = Math.abs(this.selectRange.ay - this.selectRange.by);
@@ -398,8 +468,8 @@ class ConwayChart {
       let scale = Math.min(this.height / hh, this.width / ww);
       this.scale = Math.min(Math.max(scale, this.minScale), this.maxScale);
 
-      this.offsetX = (0 - x) * this.blockWidth * this.scale;
-      this.offsetY = (0 - y) * this.blockWidth * this.scale;
+      this.offsetX = Math.round((0 - x) * this.blockWidth * this.scale);
+      this.offsetY = Math.round((0 - y) * this.blockWidth * this.scale);
       this.render();
       return;
     }
@@ -438,8 +508,8 @@ class ConwayChart {
       let scale = Math.min(this.height / hh, this.width / ww);
       this.scale = Math.min(Math.max(scale, this.minScale), this.maxScale);
 
-      this.offsetX = this.width / 2 - midX * this.blockWidth * this.scale;
-      this.offsetY = this.height / 2 - midY * this.blockWidth * this.scale;
+      this.offsetX = Math.round(this.width / 2 - midX * this.blockWidth * this.scale);
+      this.offsetY = Math.round(this.height / 2 - midY * this.blockWidth * this.scale);
 
       this.render();
     }else{
@@ -470,8 +540,8 @@ class ConwayChart {
     var y = this.height / 2 - this.offsetY;
     
     let step = this.scale - oldScale;
-    var offsetX = (x / oldScale) * step;
-    var offsetY = (y / oldScale) * step;
+    var offsetX = Math.round((x / oldScale) * step);
+    var offsetY = Math.round((y / oldScale) * step);
 
     this.offsetX -= offsetX;
     this.offsetY -= offsetY;
