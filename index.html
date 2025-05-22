@@ -20,9 +20,15 @@
                     <span>/</span>
                     S<input id="ruleS" class="need-forbidden" title="23" value="23" type="number" style="width: 50px;">
                 </div>
-                <div>速度: <input id="speed" class="need-forbidden" value="100" type="number" style="width: 50px;margin-right: 15px;margin-left: 5px;"><span>ms/step</span></div>
+                <div>
+                    <label><input id="fastForward" type="checkbox" />快进:</label>
+                    <div style="margin-left:5px;width:55px;display: inline-block;"><span id="genCount">1</span></div>
+                    <label>
+                        <button style="width: 22px;" onclick="updateStep(1)">+</button>
+                        <button style="width: 22px;" onclick="updateStep(-1)">-</button>
+                    </label>
+                </div>
                 <div style="align-items: center; display: grid; padding: 5px 0px; display: inline-block;">
-                    <label><input id="fastForward" type="checkbox" class="need-forbidden" />快进</label>
                     <button id="runBtn" onclick="run()">运行</button>
                     <div style="margin-left:5px;width:35px;display: inline-block;"><span id="stepCount">0</span></div>
                     <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
@@ -68,7 +74,7 @@
             <div class="group-panel">
                 <div style="align-items: center; display: inline-block; padding: 5px;">
                     <label for="randomSeed">夜间模式:</label>
-                    <label class="switch" data-enabled="true"><input type="checkbox" id="styleToggleSwitch" class="need-forbidden" ><span class="slider round"></span></label>
+                    <label class="switch" data-enabled="true"><input type="checkbox" id="styleToggleSwitch" ><span class="slider round"></span></label>
                 </div>
             </div>
             <div class="group-panel">
@@ -119,10 +125,10 @@
             }
 
             const hl = hashlife();
-            const conwaySpace = new ConwayChart(document.getElementById('conwaySpace'), function(ff){
+            const conwaySpace = new ConwayChart(document.getElementById('conwaySpace'), function(ff, interceptor){
                 hl.traverse((x, y) => {
                     ff(x, y);
-                });
+                }, interceptor);
             }, function(x, y){
                 if(document.getElementById('editToggleSwitch').checked){
                     hl.addPoint(x, y);
@@ -339,12 +345,6 @@
                         enableEdit();
                     }
                 }else{
-                    let p = document.getElementById('speed').value;
-                    if(p < 100){ 
-                        alert("速度太快"); 
-                        return;
-                    }
-
                     running = true;
                     let controls = document.getElementsByClassName('need-forbidden');
                     for(let c of controls){
@@ -362,7 +362,7 @@
                     intervalId = setInterval(() => {
                         document.getElementById("stepCount").innerText = ++cc;
                         nextStep(fastForward);
-                    }, p);
+                    }, 100);
                 }
             }
 
@@ -627,6 +627,9 @@
                 document.getElementById('importFilename').innerText = "文件名:" + filename;
                 document.getElementById('importFilename').title = filename;
                 document.getElementById('importFilenameCon').style.display = "block";
+            }
+            function updateStep(s){
+                document.getElementById("genCount").innerText = hl.setStep(hl.getStep() + s);
             }
 
             function test(){

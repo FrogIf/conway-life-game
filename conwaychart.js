@@ -44,12 +44,6 @@ class ConwayChart {
     this.imageDataBuffer = new Int32Array(this.imageData.data.buffer);
     this.drawBackground();
 
-    this.preChartStatus = {  // 记录图像状态, 用来判断是否有变化需要重绘
-      scale: this.scale,
-      offsetX: this.offsetX,
-      offsetY: this.offsetY
-    };
-
     // 添加鼠标作为位置监听
     this.El.addEventListener('mousemove', this.mousePositionListener, false);
     
@@ -168,7 +162,12 @@ class ConwayChart {
       
       this.scale = Math.min(this.maxScale, Math.max(this.scale, this.minScale));
 
-      this.render();
+      if(!this.scaling){
+        this.scaling = true;
+        this.render();
+      }
+    }else{
+      this.scaling = false;
     }
   }
   
@@ -188,6 +187,9 @@ class ConwayChart {
     }else if(this.editable){
       this.El.addEventListener('mousemove', this.addOverPoint, false);
     }else{
+      this.moveing = true;
+      this.render();
+      
       this.targetX = e.offsetX;
       this.targetY = e.offsetY;
 
@@ -206,6 +208,7 @@ class ConwayChart {
 
   // 移除鼠标移动事件
   removeMouseMove = () => {
+    this.moveing = false;
     this.El.removeEventListener('mousemove', this.moveCanvasFunc, false);
     this.El.removeEventListener('mousemove', this.addOverPoint, false);
     this.El.removeEventListener('mousemove', this.renderSelectRange, false);
@@ -231,20 +234,8 @@ class ConwayChart {
   moveCanvasFunc = (e) => {
     this.offsetX = Math.round(this.mousedownOriginX + (e.offsetX - this.targetX));
     this.offsetY = Math.round(this.mousedownOriginY + (e.offsetY - this.targetY));
-    
-    this.render();
+    // this.render();
   }
-
-    // 判断图像状态是否有变化
-    isChartStatusChange(){
-      if(this.preChartStatus.scale != this.scale || this.preChartStatus.offsetX != this.offsetX || this.preChartStatus.offsetY != this.offsetY){
-        this.preChartStatus.scale = this.scale;
-        this.preChartStatus.offsetX = this.offsetX;
-        this.preChartStatus.offsetY = this.offsetY;
-        return true;
-      }
-      return false;
-    }
 
   // 渲染
   render() {
@@ -252,27 +243,49 @@ class ConwayChart {
     this.El.height = this.height;
     
     const self = this;
+    const blockColor = this.style.pointColor.r | this.style.pointColor.g << 8 | this.style.pointColor.b << 16 | 0xFF << 24;
+    
     function animate(){
       self.drawBackground();  // 绘制背景
 
+      let blockWidth = self.blockWidth * self.scale;
+      let range = self.getViewRange();
       let offsetX = Math.round(self.offsetX);
       let offsetY = Math.round(self.offsetY);
-      let blockWidth = self.blockWidth * self.scale;
 
-      self.drawSelectRange(offsetX, offsetY, blockWidth);  // 绘制选区
-  
-      let range = self.getViewRange();
-      // 绘制点
-      self.pointProduce((x, y) => {
+      // 根据坐标画方块
+      const drawBlockFun = (x, y) => {
         if(x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY){
           let xi = x * blockWidth + offsetX;
           let yi = y * blockWidth + offsetY;
           if(xi <= self.width && yi <= self.height){
-            self.drawBlock(Math.round(xi), Math.round(yi), blockWidth);
+            self.drawBlock((xi | 0), (yi | 0), blockWidth, blockColor);
           }
         }
-      });
+      };
 
+      // 拦截器, 返回false时, 节点遍历停止下钻
+      const interceptor = (x, y, d) => {
+        let sideCount = 1 << d;
+        if(sideCount * blockWidth <= 1){ // 如果整个区域像素不到1了, 就不必再往深度遍历了
+          let xi = x * blockWidth + offsetX;
+          let yi = y * blockWidth + offsetY;
+          if(xi <= self.width && yi <= self.height){
+            self.drawBlock((xi | 0), (yi | 0), 1, blockColor);
+          }
+          return false;
+        }else{
+          let halfSide = sideCount >> 1;
+          // 超出可视范围的区域, 不再继续深度遍历
+          return !(x + halfSide < range.minX || x - halfSide > range.maxX || y + halfSide < range.minY || y - halfSide > range.maxY);
+        }
+      };
+
+      self.drawSelectRange(offsetX, offsetY, blockWidth);  // 绘制选区
+
+      // 绘制点
+      self.pointProduce(drawBlockFun, interceptor);
+      
       if(blockWidth > 5){
         let x = Math.ceil((0 - offsetX) / blockWidth);
         let y = Math.ceil((0 - offsetY) / blockWidth);
@@ -281,16 +294,16 @@ class ConwayChart {
         // 绘制网格
         self.drawGrid(xi, yi, blockWidth);
       }
-  
+      
       // 渲染
       self.ctx.putImageData(self.imageData, 0, 0);
 
-      if(self.isChartStatusChange()){
+      if(self.moveing || self.scaling ){
         requestAnimationFrame(animate);
       }
     }
 
-    requestAnimationFrame(animate);
+    animate();
   }
 
   // 绘制背景
@@ -322,12 +335,12 @@ class ConwayChart {
       return;
     }
 
-    let startXi = Math.round(startX * unit + offsetX);
-    let startYi = Math.round(startY * unit + offsetY);
-    let width = Math.round((endX + 1) * unit + offsetX) - startXi;
-    let height = Math.round((endY + 1) * unit + offsetY) - startYi;
+    let startXi = (startX * unit + offsetX) | 0;
+    let startYi = (startY * unit + offsetY) | 0;
+    let width = (((endX + 1) * unit + offsetX) | 0) - startXi;
+    let height = (((endY + 1) * unit + offsetY) | 0) - startYi;
     let start = startYi * this.width + startXi;
-    let skipRows = Math.round(this.width);
+    let skipRows = this.width;
     let color = this.style.selectColor.r | this.style.selectColor.g << 8 | this.style.selectColor.b << 16 | 0xFF << 24;
     for(let i = 0; i < height; i++){
       for(let j = 0; j < width; j++){
@@ -345,7 +358,7 @@ class ConwayChart {
     
     // 绘制垂直线
     for (let c = 0; c <= colCount; c++) {
-      let xx = Math.round(c * unit + decimalStartX);
+      let xx = (c * unit + decimalStartX) | 0;
       if(xx > this.width){ continue; }
       for(let r = 0; r < this.height; r++){
         this.imageDataBuffer[this.width * r + xx] = lineColor;
@@ -354,7 +367,7 @@ class ConwayChart {
   
     // 绘制水平线
     for (let r = 0; r <= rowCount; r++) {
-        let yy = Math.round(r * unit + decimalStartY);
+        let yy = (r * unit + decimalStartY) | 0;
         if(yy > this.height){ continue; }
         for(let w = 0; w < this.width; w++){
           this.imageDataBuffer[this.width * yy + w] = lineColor;
@@ -363,47 +376,25 @@ class ConwayChart {
   }
 
   // 绘制块
-  drawBlock(x, y, unit) {
-    let enhance = this.calculateEnhance();
-    let blockWidth = Math.max(Math.round(unit * enhance), 1);
-
+  drawBlock(x, y, unit, blockColor) {
+    let blockWidth = unit > 1 ? unit : 1;
+    
     let width = blockWidth, height = blockWidth;
     if(x < 0){ width += x; x = 0; }  // 裁切左边界
+    else if(x + width > this.width){ width = this.width - x; } // 裁切右边界
     if(y < 0){ height += y; y = 0; }  // 裁切上边界
-    if(x + width > this.width){ width = this.width - x; } // 裁切右边界
-    if(y + height > this.height){ height = this.height - y; } // 裁切下边界
-
-    width = Math.round(width);
-    height = Math.round(height);
+    else if(y + height > this.height){ height = this.height - y; } // 裁切下边界
+    
     if(width <= 0 || height <= 0){ return; }
-    let start = Math.round(x + y * this.width);
-
-    let skipRows = Math.round(this.width);
-    let color = this.style.pointColor.r | this.style.pointColor.g << 8 | this.style.pointColor.b << 16 | 0xFF << 24;
+    let start = x + y * this.width; // asset start 是整数
+    // let start = Math.round(x + y * this.width);
+    
     for(let i = 0; i < height; i++){
       for(let j = 0; j < width; j++){
-        this.imageDataBuffer[start + j] = color;
+        this.imageDataBuffer[start + j] = blockColor;
       }
-      start += skipRows;
+      start += this.width;  // asset this.width 是整数
     }
-  }
-
-  calculateEnhance(){
-    let enhance = 1;
-    if(this.scale <= 0.00002){  // 使得scale <= 0.00002时, block的scale始终接近0.007
-      enhance = Math.floor(0.007 / this.scale);
-    } else if(this.scale <= 0.0001){  // 使得 0.00002 < scale <= 0.0001 时, block的scale由0.007逐渐增长至0.03
-      enhance = this.enhanceTransition(0.00002, 0.0001, 0.007, 0.03);
-    } else if(this.scale <= 0.02){   // 使得 0.0001 < scale <= 0.02 时, block的scale由0.03逐渐增长至0.1
-      enhance = this.enhanceTransition(0.0001, 0.02, 0.03, 0.1);
-    } else if(this.scale <= 0.1){  // 使得 0.01 < scale <= 0.1时, block的scale始终接近是0.1
-      enhance = Math.floor(0.1 / this.scale);
-    }
-    return enhance;
-  }
-
-  enhanceTransition(startRange, endRange, minBlockScale, maxBlockScale){
-    return Math.floor((minBlockScale + (this.scale - startRange) / (endRange - startRange) * (maxBlockScale - minBlockScale)) / this.scale);
   }
 
   // 获取画布的可视坐标范围

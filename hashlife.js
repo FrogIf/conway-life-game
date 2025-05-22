@@ -1,4 +1,6 @@
 function hashlife(){
+    const DEFAULT_STEP = 2;
+    var step = DEFAULT_STEP;  // 快进跳代时的上限, 只有node.depth <= step时才会执行快进, 同时, 通过这个值可以计算出跳跃的代数 gen = 1 << (step - 2);
     var index = 2;
     function idGenerate(){ // 生成节点id
         return index++;
@@ -46,9 +48,13 @@ function hashlife(){
      * 需要不定期执行垃圾清理, 否则内存会爆
      */
     function gc(){
-        if(index < 1000000){ return; } // 小于100w不清理
+        if(index < 5000000){ return; } // 小于500w不清理
+        let preIndex = index;
+        let start = Date.now();
         initCache();
         function refreshToCache(node){
+            if(node.newNode){ return node.newNode; }
+
             if(node.depth > 1){
                 let side = calculateSideLength(node.depth);
                 let halfSide = side >> 1;
@@ -57,22 +63,34 @@ function hashlife(){
                 let nw = empty;
                 let se = empty;
                 let sw = empty;
-                if(halfSide != node.ne.l){ ne = refreshToCache(node.ne); }
-                if(halfSide != node.nw.l){ nw = refreshToCache(node.nw); }
-                if(halfSide != node.se.l){ se = refreshToCache(node.se); }
-                if(halfSide != node.sw.l){ sw = refreshToCache(node.sw); }
-                return buildNode({
+                if(node.ne.count > 0){ ne = refreshToCache(node.ne); }
+                if(node.nw.count > 0){ nw = refreshToCache(node.nw); }
+                if(node.se.count > 0){ se = refreshToCache(node.se); }
+                if(node.sw.count > 0){ sw = refreshToCache(node.sw); }
+                let newNode = buildNode({
                     depth: node.depth,
+                    count: node.count,
                     ne: ne,
                     nw: nw,
                     se: se,
                     sw: sw
                 });
+                if(node.evolveCache){
+                    newNode.evolveCache = node.evolveCache;
+                    for(let [key, value] of node.evolveCache){
+                        node.evolveCache.set(key, refreshToCache(value));
+                    }
+                }
+                
+                node.newNode = newNode;
+                return newNode;
             }else{
-                return buildNode({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: node.sw });
+                node.newNode = buildNode({ depth: 1, ne: node.ne, nw: node.nw, se: node.se, sw: node.sw });
+                return node.newNode;
             }
         }
         root = refreshToCache(root);
+        console.log(`gc duration : ${Date.now() - start}, before : ${preIndex}, after : ${index} `);
     }
 
     // 构建节点, 向缓存中添加节点, 计算节点的附加属性
@@ -82,53 +100,25 @@ function hashlife(){
             node = cacheNode;
         }else{
             setNodeToCache(node);
-            calculateNodeLiveEdge(node);
+            calculateChildrenCount(node);
         }
         return node;
     }
 
-    /*
-     * 计算节点的中"最近"距离, 如果没有存活点, 则距离是边长
-     * r: 右边距离存活点的最近距离
-     * l: 左边距离存活点的最近距离
-     * t: 顶部距离存活点的最近距离
-     * b: 底部距离存活点的最近距离
-     */
-    function calculateNodeLiveEdge(node){
-        if(node.l != undefined) { return; }
-
+    function calculateChildrenCount(node){
+        if(node.count != undefined) { return; }
+        
         if(node.depth == 1){
-            let v = 1 - (node.nw._id | node.sw._id);
-            node.l = v == 0 ? 0 : (2 - (node.ne._id | node.se._id));
-
-            v = 1 - (node.se._id | node.ne._id);
-            node.r = v == 0 ? 0 : (2 - (node.nw._id | node.sw._id));
-            
-            v = 1 - (node.ne._id | node.nw.nw._id);
-            node.t = v == 0 ? 0 : (2 - (node.se._id | node.sw._id));
-
-            v = 1 - (node.se._id | node.sw._id);
-            node.b = v == 0 ? 0 : (2 - (node.ne._id | node.nw._id));
+            node.count = node.ne._id + node.nw._id + node.se._id + node.sw._id;
             return;
         }
         
-        calculateNodeLiveEdge(node.ne);
-        calculateNodeLiveEdge(node.nw);
-        calculateNodeLiveEdge(node.sw);
-        calculateNodeLiveEdge(node.se);
+        calculateChildrenCount(node.ne);
+        calculateChildrenCount(node.nw);
+        calculateChildrenCount(node.sw);
+        calculateChildrenCount(node.se);
 
-        let halfSide = calculateSideLength(node.depth - 1);
-        let a = Math.min(node.nw.l, node.sw.l);
-        node.l = a == halfSide ? (halfSide + Math.min(node.ne.l, node.se.l)) : a;
-
-        a = Math.min(node.se.r, node.ne.r);
-        node.r = a == halfSide ? (halfSide + Math.min(node.nw.r, node.sw.r)) : a;
-        
-        a = Math.min(node.ne.t, node.nw.t);
-        node.t = a == halfSide ? (halfSide + Math.min(node.se.t, node.sw.t)) : a;
-
-        a = Math.min(node.se.b, node.sw.b);
-        node.b = a == halfSide ? (halfSide + Math.min(node.ne.b, node.nw.b)) : a;
+        node.count = node.ne.count + node.nw.count + node.se.count + node.sw.count;
     }
 
     const c0 = { depth: 0, _id: 0, ne: 0, nw: 0, se: 0, sw: 0 };
@@ -157,7 +147,13 @@ function hashlife(){
 
     function initCache(){
         index = 2;
-        nodeCache = new Array();
+        if(nodeCache){
+            for(let cc of nodeCache){
+                cc.clear();
+            }
+        }else{
+            nodeCache = new Array();
+        }
         emptyNodes = new Array();
         emptyNodes.push(c0);
         buildNode({depth: 1, ne: c0, nw: c0, se: c0, sw: c0});
@@ -232,11 +228,16 @@ function hashlife(){
     var root = createEmptyNode(4); // 初始状态只有四个点
     const hl = {};
 
-    function evolve(node, fastForward, rule){ // 返回的是下一代的中心区域结果
-        let result = fastForward ? node.ffEvolveResult : node.evolveResult;
-        if(result){
-            let res = result.get(rule.key);
-            if(res){ return res; }
+    function evolve(node, fastForward, rule, genStep){ // 返回的是下一代的中心区域结果
+        let result = null;
+        let cacheKey = `${genStep}_${rule.key}`;
+        if(node.evolveCache){
+            result = node.evolveCache.get(cacheKey);
+            if(result){
+                return result;
+            }
+        }else{
+            node.evolveCache = new Map();
         }
 
         if(node.depth == 2){  // 4 x 4
@@ -263,18 +264,16 @@ function hashlife(){
              */
             let node1, node2, node3, node4, node5, node6, node7, node8, node9;
             let cDepth = node.depth - 1;
-            let ff = fastForward && node.depth < 20; // 层级太高时, 不进行跳代, 防止程序卡顿
-            // let ff = fastForward; // 层级太高时, 不进行跳代, 防止程序卡顿
-            if(ff){ // 快进
-                node1 = evolve(node.nw, fastForward, rule);
-                node2 = evolve(buildNode({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }), fastForward, rule);
-                node3 = evolve(node.ne, fastForward, rule);
-                node4 = evolve(buildNode({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }), fastForward, rule);
-                node5 = evolve(buildNode({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }), fastForward, rule);
-                node6 = evolve(buildNode({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }), fastForward, rule);
-                node7 = evolve(node.sw, fastForward, rule);
-                node8 = evolve(buildNode({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }), fastForward, rule);
-                node9 = evolve(node.se, fastForward, rule);
+            if(fastForward && node.depth <= genStep){ // 快进 (层级太高时, 不进行跳代, 防止程序卡顿)
+                node1 = evolve(node.nw, fastForward, rule, genStep);
+                node2 = evolve(buildNode({depth: cDepth, ne : node.ne.nw, nw : node.nw.ne, sw : node.nw.se, se : node.ne.sw }), fastForward, rule, genStep);
+                node3 = evolve(node.ne, fastForward, rule, genStep);
+                node4 = evolve(buildNode({depth: cDepth, ne : node.nw.se, nw : node.nw.sw, sw : node.sw.nw, se : node.sw.ne }), fastForward, rule, genStep);
+                node5 = evolve(buildNode({depth: cDepth, ne : node.ne.sw, nw : node.nw.se, sw : node.sw.ne, se : node.se.nw }), fastForward, rule, genStep);
+                node6 = evolve(buildNode({depth: cDepth, ne : node.ne.se, nw : node.ne.sw, sw : node.se.nw, se : node.se.ne }), fastForward, rule, genStep);
+                node7 = evolve(node.sw, fastForward, rule, genStep);
+                node8 = evolve(buildNode({depth: cDepth, ne : node.se.nw, nw : node.sw.ne, sw : node.sw.se, se : node.se.sw }), fastForward, rule, genStep);
+                node9 = evolve(node.se, fastForward, rule, genStep);
             }else{
                 let dd = node.depth - 2;
                 node1 = buildNode({depth: dd, ne : node.nw.ne.sw, nw : node.nw.nw.se, sw : node.nw.sw.ne, se : node.nw.se.nw });
@@ -289,19 +288,13 @@ function hashlife(){
             }
             result = buildNode({
                 depth: cDepth,
-                ne: evolve(buildNode({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6}), fastForward, rule),
-                nw: evolve(buildNode({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5}), fastForward, rule),
-                sw: evolve(buildNode({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8}), fastForward, rule),
-                se: evolve(buildNode({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}), fastForward, rule)
+                ne: evolve(buildNode({depth: cDepth, ne: node3, nw: node2, sw: node5, se: node6}), fastForward, rule, genStep),
+                nw: evolve(buildNode({depth: cDepth, ne: node2, nw: node1, sw: node4, se: node5}), fastForward, rule, genStep),
+                sw: evolve(buildNode({depth: cDepth, ne: node5, nw: node4, sw: node7, se: node8}), fastForward, rule, genStep),
+                se: evolve(buildNode({depth: cDepth, ne: node6, nw: node5, sw: node8, se: node9}), fastForward, rule, genStep)
             });
         }
-        if(fastForward){
-            if(!node.ffEvolveResult) { node.ffEvolveResult = new Map(); }
-            node.ffEvolveResult.set(rule.key, result);
-        }else{
-            if(!node.evolveResult) { node.evolveResult = new Map(); }
-            node.evolveResult.set(rule.key, result);
-        }
+        node.evolveCache.set(cacheKey, result);
         return result;
     }
 
@@ -387,20 +380,21 @@ function hashlife(){
         }
     }
 
-    function traverse(node, callback, centerX, centerY){
-        if(node.depth == 1){
+    function traverse(node, callback, centerX, centerY, interceptor = (x,y,d) => { return true; }){
+        let d = node.depth;
+        if(!interceptor(centerX, centerY, d)){ return; }  // 拦截器, 使得不再继续向深处遍历
+        if(d == 1){
             if(node.ne._id == 1){ callback(centerX, centerY - 1); }
             if(node.nw._id == 1){ callback(centerX - 1, centerY - 1); }
             if(node.se._id == 1){ callback(centerX, centerY); }
             if(node.sw._id == 1){ callback(centerX - 1, centerY); }
         }else{
-            let side = calculateSideLength(node.depth);
-            let halfSide = side >> 1;
+            let side = calculateSideLength(d);
             let offset = side >> 2;
-            if(halfSide != node.ne.l){ traverse(node.ne, callback, centerX + offset, centerY - offset); }
-            if(halfSide != node.nw.l){ traverse(node.nw, callback, centerX - offset, centerY - offset); }
-            if(halfSide != node.se.l){ traverse(node.se, callback, centerX + offset, centerY + offset); }
-            if(halfSide != node.sw.l){ traverse(node.sw, callback, centerX - offset, centerY + offset); }
+            if(node.ne.count > 0){ traverse(node.ne, callback, centerX + offset, centerY - offset, interceptor); }
+            if(node.nw.count > 0){ traverse(node.nw, callback, centerX - offset, centerY - offset, interceptor); }
+            if(node.se.count > 0){ traverse(node.se, callback, centerX + offset, centerY + offset, interceptor); }
+            if(node.sw.count > 0){ traverse(node.sw, callback, centerX - offset, centerY + offset, interceptor); }
         }
     }
 
@@ -611,19 +605,29 @@ function hashlife(){
         if(!ruleExpress){ ruleExpress = 'B3/S23'; }
         let rule = parseRuleExpress(ruleExpress);
 
-        // 1. 区域扩展, 生命游戏中的光速是, 1步一格
-        // 2. 获取存活最大值
-        if(fastForward){
-            let skipGen = 1 << (root.depth - 2); // 计算跳跃的代数
-            if(root.l <= skipGen || root.r <= skipGen || root.t <= skipGen || root.b <= skipGen){
-                root = extendNode(root);
-            }
+        let genStep;
+        if(!fastForward){
+            genStep = DEFAULT_STEP;
         }else{
-            if(root.l == 0 || root.r == 0 || root.t == 0 || root.b == 0){
-                root = extendNode(root);
-            }
+            genStep = step;
         }
-        root = evolve(extendNode(root), fastForward, rule);
+        /*
+         * 扩充后单边空白距离: a = (2 ^(x-1) - 2^(x-3)) = 2^(x-2) + 2^(x-3)
+         * 演化后, 跳过的代数: b = 2^(x-2)
+         * 生命游戏中的光速: 每代前进1步
+         * a > b
+         */
+        while(
+            (root.depth <= genStep) ||
+            root.nw.count !== root.nw.se.se.count ||
+            root.ne.count !== root.ne.sw.sw.count ||
+            root.sw.count !== root.sw.ne.ne.count ||
+            root.se.count !== root.se.nw.nw.count)
+        {
+            root = extendNode(root);
+        }
+        
+        root = evolve(extendNode(root), fastForward, rule, genStep);
         gc();
     }
 
@@ -657,8 +661,8 @@ function hashlife(){
     /**
      * 遍历点, 如果是存活状态, 会触发回调, 否则不会
      */
-    hl.traverse = function(callback){
-        traverse(root, callback, 0, 0);
+    hl.traverse = function(callback, interceptor){
+        traverse(root, callback, 0, 0, interceptor??undefined);
     }
 
     /**
@@ -680,11 +684,19 @@ function hashlife(){
         return calculateSideLength(root.depth);
     }
 
+    hl.setStep = function(ss){
+        if(ss < 2){ ss = 2; }  // 快进节点的范围: [2, 19]
+        if(ss > 19){ ss = 19; }
+        step = ss;
+        return 1 << (step - 2);
+    }
+
+    hl.getStep = function(){
+        return step;
+    }
+
     hl.test = function(){
-        // console.log(root);
         console.log(nodeCache.length, index);
-        // console.log(nodeHolder.size, index);
-        // time = 0;
     }
 
     return hl;

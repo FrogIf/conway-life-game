@@ -155,3 +155,7 @@ input:checked + .slider:before {
 .switch[data-enabled="false"] .slider:before {
   background-color: #eee;
 }
+
+.need-forbidden:disabled{
+    cursor: no-drop;
+}
