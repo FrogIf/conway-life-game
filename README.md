@@ -53,5 +53,6 @@
 * [HashLife](https://www.dev-mind.blog/hashlife/)
 * [使用canvas 如何绘制形状并支持拖拽、缩放功能](https://juejin.cn/post/6913835124681342989)
 * [Conway's Game of Life viewer](http://copy.sh/life/)
+* [copy.life](https://github.com/copy/life)
 * [rle文件格式](https://shuaitq.github.io/post/rle%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F/)
 * [LifeWiki](https://conwaylife.com/wiki/Main_Page)
