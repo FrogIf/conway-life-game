@@ -414,8 +414,12 @@ function hashlife(){
             rootSide = calculateSideLength(root.depth);
         }
         root = updatePointStatus(root, x, y, producer);
+        nodeChangeListener(root.count);
         gc();
     }
+
+    // 节点变更监听
+    var nodeChangeListener = (c) => {};
 
     /**
      * 添加存活点
@@ -574,6 +578,7 @@ function hashlife(){
             }
         }
         root = tree;
+        nodeChangeListener(root.count);
         gc();
     }
 
@@ -628,6 +633,7 @@ function hashlife(){
         }
         
         root = evolve(extendNode(root), fastForward, rule, genStep);
+        nodeChangeListener(root.count);
         gc();
     }
 
@@ -670,6 +676,7 @@ function hashlife(){
      */
     hl.clear = function(){
         root = createEmptyNode(4);
+        nodeChangeListener(root.count);
         gc();
     }
 
@@ -691,8 +698,16 @@ function hashlife(){
         return 1 << (step - 2);
     }
 
+    hl.getSkipGeneration = function(){
+        return 1 << (step - 2);
+    }
+
     hl.getStep = function(){
         return step;
+    }
+
+    hl.setNodeChangeListener = function(callback){
+        nodeChangeListener = callback;
     }
 
     hl.test = function(){

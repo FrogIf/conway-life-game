@@ -22,15 +22,14 @@
                 </div>
                 <div>
                     <label><input id="fastForward" type="checkbox" />快进:</label>
-                    <div style="margin-left:5px;width:55px;display: inline-block;"><span id="genCount">1</span></div>
+                    <div style="margin-left:5px;width:75px;display: inline-block;"><span id="stepCount">1</span></div>
                     <label>
                         <button style="width: 22px;" onclick="updateStep(1)">+</button>
                         <button style="width: 22px;" onclick="updateStep(-1)">-</button>
                     </label>
                 </div>
-                <div style="align-items: center; display: grid; padding: 5px 0px; display: inline-block;">
+                <div style="align-items: center; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 5px 0px;">
                     <button id="runBtn" onclick="run()">运行</button>
-                    <div style="margin-left:5px;width:35px;display: inline-block;"><span id="stepCount">0</span></div>
                     <button id="nextBtn" onclick="next()" class="need-forbidden">下一步</button>
                 </div>
             </div>
@@ -106,7 +105,11 @@
             </div>
         </div>
         <div class="bottom-monitor-panel">
-            <span id="coordinate" class="monitor-label">(0,0)</span>
+            <span id="coordinate" class="monitor-label">0,0</span>
+            <span>|</span>
+            <span id="countLabel" class="monitor-label">Count: 0</span>
+            <span>|</span>
+            <span id="genCount" class="monitor-label">Gen: 0</span>
         </div>
         <script>
             function disableSwitch(dom){
@@ -125,6 +128,9 @@
             }
 
             const hl = hashlife();
+            hl.setNodeChangeListener(function(count){
+                document.getElementById("countLabel").innerText = `Count: ${count}`;
+            });
             const conwaySpace = new ConwayChart(document.getElementById('conwaySpace'), function(ff, interceptor){
                 hl.traverse((x, y) => {
                     ff(x, y);
@@ -136,7 +142,7 @@
                     hl.removePoint(x, y);
                 }
             }, function(x, y){
-                document.getElementById("coordinate").innerText = `(${x},${y})`;
+                document.getElementById("coordinate").innerText = `${x},${y}`;
             });
 
             document.getElementById('styleToggleSwitch').addEventListener('change', function() {
@@ -150,6 +156,7 @@
             }
 
             function clearAll(){
+                resetGenCount();
                 hl.clear();
                 conwaySpace.cancelSelectRange();
                 conwaySpace.render();
@@ -316,10 +323,21 @@
                 nextStep(document.getElementById('fastForward').checked);
             }
 
+            var genCount = 0;
+            function updateGenCount(){
+                genCount += hl.getSkipGeneration();
+                document.getElementById('genCount').innerText = `Gen: ${genCount}`;
+            }
+            function resetGenCount(){
+                genCount = 0;
+                document.getElementById('genCount').innerText = `Gen: ${genCount}`;
+            }
+
             function nextStep(fastForward){
                 let b = document.getElementById('ruleB').value;
                 let s = document.getElementById('ruleS').value;
                 hl.nextGenerate(fastForward, "B" + b + "/S" + s);
+                updateGenCount();
                 conwaySpace.render();
             }
 
@@ -357,10 +375,7 @@
 
                     var fastForward = document.getElementById('fastForward').checked;
 
-                    // setInterval使用的是任务队列, 如果内部耗时过长, 可能有队列积压的风险
-                    let cc = 0;
                     intervalId = setInterval(() => {
-                        document.getElementById("stepCount").innerText = ++cc;
                         nextStep(fastForward);
                     }, 100);
                 }
@@ -629,7 +644,7 @@
                 document.getElementById('importFilenameCon').style.display = "block";
             }
             function updateStep(s){
-                document.getElementById("genCount").innerText = hl.setStep(hl.getStep() + s);
+                document.getElementById("stepCount").innerText = hl.setStep(hl.getStep() + s);
             }
 
             function test(){
