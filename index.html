@@ -162,15 +162,6 @@
                 conwaySpace.render();
             }
 
-            function invertPointStatus(x, y){
-                let m = hl.checkStatus(x, y);
-                if(m == 1){
-                    hl.removePoint(x, y);
-                }else{
-                    hl.addPoint(x, y);
-                }
-            }
-
             function getRandomInt(min, max) {
                 return Math.floor(Math.random() * (max - min + 1)) + min;
             }
@@ -196,7 +187,7 @@
                 for(let r = selectRange.ay; r <= selectRange.by; r++){
                     for(let c = selectRange.ax; c <= selectRange.bx; c++){
                         if(getRandomInt(min, max) <= seed){
-                            invertPointStatus(c, r);
+                            hl.invertStatus(c, r);
                         }
                     }
                 }
