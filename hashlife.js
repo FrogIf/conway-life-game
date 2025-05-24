@@ -355,7 +355,7 @@ function hashlife(){
      * 获取指定节点状态
      */
     function getPointStatus(node, x, y){
-        let direction = (x <= 0 ? 1 : 0) | ((y <= 0 ? 1 : 0) << 1);
+        let direction = (x < 0 ? 1 : 0) | ((y < 0 ? 1 : 0) << 1);
         if(node.depth == 1){
             if(direction == 0){  // se
                 return node.se._id;
