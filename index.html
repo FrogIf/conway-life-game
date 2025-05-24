@@ -21,8 +21,8 @@
                     S<input id="ruleS" class="need-forbidden" title="23" value="23" type="number" style="width: 50px;">
                 </div>
                 <div>
-                    <label><input id="fastForward" type="checkbox" />快进:</label>
-                    <div style="margin-left:5px;width:75px;display: inline-block;"><span id="stepCount">1</span></div>
+                    <label>快进:</label>
+                    <div style="margin-left:5px;width:95px;display: inline-block;"><span id="stepCount">1</span></div>
                     <label>
                         <button style="width: 22px;" onclick="updateStep(1)">+</button>
                         <button style="width: 22px;" onclick="updateStep(-1)">-</button>
@@ -311,7 +311,7 @@
             }
 
             function next(){
-                nextStep(document.getElementById('fastForward').checked);
+                nextStep(true);
             }
 
             var genCount = 0;
@@ -364,10 +364,8 @@
                     conwaySpace.disableSelect();
                     disableEdit();
 
-                    var fastForward = document.getElementById('fastForward').checked;
-
                     intervalId = setInterval(() => {
-                        nextStep(fastForward);
+                        nextStep(true);
                     }, 100);
                 }
             }
