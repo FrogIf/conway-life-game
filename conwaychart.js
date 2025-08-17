@@ -26,6 +26,7 @@ class ConwayChart {
     this.editable = false; // 是否可以鼠标点击编辑
     this.selectable = false;  // 是否可以框选
     this.styleMark = 0;
+    this.rendering = false;
     this.style = {
       pointColor: { r: 0, g: 0, b: 0 },
       gridLineColor: { r: 204, g: 204, b: 204 },
@@ -134,6 +135,7 @@ class ConwayChart {
   // 移除mousewhell 事件
   removeMouseWhell = () => {
     document.removeEventListener('mousewheel', this.scrollFunc, {passive: false});
+    this.scaling = false;
   }
 
   // 缩放
@@ -142,32 +144,12 @@ class ConwayChart {
     e.preventDefault();
 
     if(e.wheelDelta){
-      var x = e.offsetX - this.offsetX;
-      var y = e.offsetY - this.offsetY;
-
-      var offsetX = Math.round((x / this.scale) * this.step);
-      var offsetY = Math.round((y / this.scale) * this.step);
-
-      if(e.wheelDelta > 0){
-        this.offsetX -= this.scale >= this.maxScale ? 0 : offsetX;
-        this.offsetY -= this.scale >= this.maxScale ? 0 : offsetY;
-
-        this.scale += this.step;
-      } else {
-        this.offsetX += this.scale <= this.minScale ? 0 : offsetX;
-        this.offsetY += this.scale <= this.minScale ? 0 : offsetY;
-
-        this.scale -= this.step;
-      }
-      
-      this.scale = Math.min(this.maxScale, Math.max(this.scale, this.minScale));
+      this.calcZoom(e.wheelDelta > 0 ? this.scale / 10 : -(this.scale / 10));
 
       if(!this.scaling){
         this.scaling = true;
-        this.render();
+        this.render(true);
       }
-    }else{
-      this.scaling = false;
     }
   }
   
@@ -187,8 +169,10 @@ class ConwayChart {
     }else if(this.editable){
       this.El.addEventListener('mousemove', this.addOverPoint, false);
     }else{
-      this.moveing = true;
-      this.render();
+      if(!this.moveing){
+        this.moveing = true;
+        this.render(true);
+      }
       
       this.targetX = e.offsetX;
       this.targetY = e.offsetY;
@@ -238,12 +222,12 @@ class ConwayChart {
   }
 
   // 渲染
-  render() {
+  render(keep /*true - 保持递归渲染*/) {
+    if(this.rendering){ return; } // 渲染中, 不需要重复调用
     this.El.width = this.width;
     this.El.height = this.height;
     
     const self = this;
-    const blockColor = this.style.pointColor.r | this.style.pointColor.g << 8 | this.style.pointColor.b << 16 | 0xFF << 24;
     
     function animate(){
       self.drawBackground();  // 绘制背景
@@ -252,6 +236,8 @@ class ConwayChart {
       let range = self.getViewRange();
       let offsetX = Math.round(self.offsetX);
       let offsetY = Math.round(self.offsetY);
+
+      const blockColor = self.style.pointColor.r | self.style.pointColor.g << 8 | self.style.pointColor.b << 16 | 0xFF << 24;
 
       // 根据坐标画方块
       const drawBlockFun = (x, y) => {
@@ -298,8 +284,10 @@ class ConwayChart {
       // 渲染
       self.ctx.putImageData(self.imageData, 0, 0);
 
-      if(self.moveing || self.scaling ){
+      if(keep && (self.moveing || self.scaling)){
         requestAnimationFrame(animate);
+      }else{
+        self.rendering = false;
       }
     }
 
@@ -513,16 +501,18 @@ class ConwayChart {
 
   // 放大
   zoomIn(){
-    this.zoom(this.scale / 10);
+    this.calcZoom(this.scale / 10);
+    this.render();
   }
 
   // 缩小
   zoomOut(){
-    this.zoom(-(this.scale / 10));
+    this.calcZoom(-(this.scale / 10));
+    this.render();
   }
 
   // 缩放
-  zoom(scaleOffset){
+  calcZoom(scaleOffset){
     let oldScale = this.scale;
     let scale = this.scale + scaleOffset;
     this.scale = Math.min(this.maxScale, Math.max(scale, this.minScale));
@@ -537,6 +527,6 @@ class ConwayChart {
     this.offsetX -= offsetX;
     this.offsetY -= offsetY;
 
-    this.render();
+    
   }
 }
