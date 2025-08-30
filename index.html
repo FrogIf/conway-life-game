@@ -8,6 +8,10 @@
         <link rel="stylesheet" type="text/css" href="index.css"/>
 	</head>
 	<body>
+        <div id="loading" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Processing...</p>
+        </div>
         <div id="conwaySpace" class="conway-space"></div>
         <div id="menuBtn" class="eye-button" style="position:fixed;right:0px;top:0px;">
             <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
@@ -112,6 +116,15 @@
             <span id="genCount" class="monitor-label">Gen: 0</span>
         </div>
         <script>
+            const loading = document.getElementById('loading');
+            // 显示 loading
+            function showLoading() {
+                loading.style.display = 'flex'; // 或使用 classList.add('show')
+            }
+            // 隐藏 loading
+            function hideLoading() {
+                loading.style.display = 'none'; // 或使用 classList.remove('show')
+            }
             function disableSwitch(dom){
                 dom.setAttribute('data-enabled', 'false');
             }
@@ -376,6 +389,7 @@
                 const file = event.target.files[0]; // 获取用户选择的文件
 
                 if (file) {
+                    showLoading();
                     const reader = new FileReader();
 
                     // 当文件读取完成时触发
@@ -383,11 +397,13 @@
                         const content = e.target.result; // 文件内容
                         readRle(content);
                         document.getElementById('fileInput').value = '';
+                        hideLoading();
                     };
 
                     // 如果需要处理错误
                     reader.onerror = function () {
                         alert("文件读取出错");
+                        hideLoading();
                     };
 
                     // 开始读取文件
@@ -502,6 +518,11 @@
 
             // 导出rle
             function dump(){
+                showLoading();
+                setTimeout(dealDump, 0);
+            }
+            // 导出rle
+            function dealDump(){
                 let minX = null, maxX = null, minY = null, maxY = null;
 
                 // 确定图像的边界范围
@@ -576,10 +597,12 @@
                     yield dumpContent;
                 }
                 
-                exportStream('dump.rle', generateLine);
+                exportStream('dump.rle', generateLine, () => {
+                    hideLoading();
+                });
             }
 
-            function exportStream(filename, dataStreamGenerator){
+            function exportStream(filename, dataStreamGenerator, finishCallback){
                 async function streamExport(filename) {
                     const readableStream = new ReadableStream({
                         async start(controller) {
@@ -613,6 +636,7 @@
                     document.body.removeChild(a);
 
                     URL.revokeObjectURL(blobUrl);
+                    finishCallback();
                 }
                 streamExport(filename);
             }
