@@ -502,10 +502,6 @@
 
             // 导出rle
             function dump(){
-                // 文件内容
-                let dumpContent = "";
-                let start = true;
-
                 let minX = null, maxX = null, minY = null, maxY = null;
 
                 // 确定图像的边界范围
@@ -525,61 +521,100 @@
                 let rows = maxY - minY + 1;
                 let cols = maxX - minX + 1;
                 for(let i = 0; i < rows; i++){
-                    arr.push(new Array(cols).fill(0));
+                    arr.push(new Int32Array(Math.ceil(cols / 32)).fill(0));
                 }
 
                 // 标记二维数组存活元素
                 hl.traverse((x, y) => {
-                    arr[y - minY][x - minX] = 1;
+                    let xx = x - minX;
+                    let line = arr[y - minY];
+                    let cc = Math.floor(xx / 32);
+                    let l = line[cc];
+                    line[cc] = l | (1 << (xx % 32));
                 });
 
-                let ruleExp = 'B' + document.getElementById('ruleB').value + '/S' + document.getElementById('ruleS').value;
-
-                // 生成rle
-                dumpContent = "#C generate by conway-life-game\n";
-                dumpContent += `x = ${cols}, y = ${rows}, rule = ${ruleExp}\n`; // 暂时只支持一个规则
-                let len = 0;
-                for(let r = 0; r < rows; r++){
-                    if(r > 0){
-                        dumpContent += '$'; 
-                    }
-                    let row = arr[r];
-                    let s = 0;
-                    let c = 0;
-                    let target = row[c];
-                    for(; c < cols + 1; c++){
-                        if(target != row[c]){
-                            if(row[c] == undefined && target == 0){ break; } // 忽略末尾空元素
-                            let cc = c - s;
-                            let exp = `${cc == 1 ? '' : cc}${target == 1 ? 'o' : 'b'}`;
-                            dumpContent += exp;
-                            len += exp.length;
-                            if(len >= 70){
-                                dumpContent += '\n';
-                                len = 0;
+                async function* generateLine(){
+                    let ruleExp = 'B' + document.getElementById('ruleB').value + '/S' + document.getElementById('ruleS').value;
+                    let dumpContent = "#C generate by conway-life-game\n";
+                    dumpContent += `x = ${cols}, y = ${rows}, rule = ${ruleExp}\n`;
+                    let len = 0;
+                    for(let r = 0; r < rows; r++){
+                        if(r > 0){
+                            dumpContent += '$'; 
+                        }
+                        let row = arr[r];
+                        let s = 0;
+                        let c = 0;
+                        let target = row[c] & 1;
+                        for(; c < cols + 1; c++){
+                            let cf = Math.floor(c / 32);
+                            let cm = c % 32;
+                            let vv = row[cf];
+                            let v = null;
+                            if(vv == undefined){ 
+                                if(target == 0){ break; }  // 忽略末尾空元素
+                            }else{
+                                v = vv >> cm & 1;
                             }
-                            target = row[c];
-                            s = c;
+                            if(target != v){
+                                let cc = c - s;
+                                let exp = `${cc == 1 ? '' : cc}${target == 1 ? 'o' : 'b'}`;
+                                dumpContent += exp;
+                                len += exp.length;
+                                if(len >= 70){
+                                    dumpContent += '\n';
+                                    yield dumpContent;
+                                    dumpContent = '';
+                                    len = 0;
+                                }
+                                target = v;
+                                s = c;
+                            }
                         }
                     }
+                    dumpContent += '!';
+                    yield dumpContent;
                 }
-                dumpContent += '!';
+                
+                exportStream('dump.rle', generateLine);
+            }
 
+            function exportStream(filename, dataStreamGenerator){
+                async function streamExport(filename) {
+                    const readableStream = new ReadableStream({
+                        async start(controller) {
+                            const dataChunks = dataStreamGenerator();
+                            
+                            try {
+                                for await (const chunk of dataChunks) {
+                                    controller.enqueue(new TextEncoder().encode(chunk));
+                                }
+                                controller.close();
+                            } catch (err) {
+                                controller.error(err);
+                            }
+                        }
+                    });
 
-                // 创建 Blob 对象
-                let blob = new Blob([dumpContent], { type: "text/plain" });
+                    const response = new Response(readableStream, {
+                        headers: {
+                            'Content-Type': 'text/plain; charset=utf-8'
+                        }
+                    });
 
-                // 生成文件 URL
-                let url = URL.createObjectURL(blob);
+                    const blob = await response.blob();
 
-                // 创建 <a> 标签并触发下载
-                let a = document.createElement("a");
-                a.href = url;
-                a.download = "dump.rle"; // 设置文件名
-                a.click();
+                    const blobUrl = URL.createObjectURL(blob);  // 阻塞等待blob生成完成
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
 
-                // 释放 URL 对象
-                URL.revokeObjectURL(url);
+                    URL.revokeObjectURL(blobUrl);
+                }
+                streamExport(filename);
             }
 
             let demoArr = [
